@@ -17,22 +17,34 @@
 | `ping` | 서버·토큰·KV 연결 상태 확인 |
 | `get_quote` | 주식/ETF 현재가 스냅샷 (주식: PER·PBR·시총 / ETF: NAV·괴리율) |
 | `get_return` | 지정 기간(1D~5Y, YTD) 수익률 단일 수치 |
-| `get_chart` | OHLCV 일·주·월·년 시계열 (최대 500포인트, 초과 시 다운샘플링) |
+| `get_chart` | OHLCV 시계열 — 일/주/월/년 + **분봉(1/3/5/10/15/30/60분)**. 일봉 페이지네이션 ≈ 8년치, 분봉 최대 5 영업일 |
 | `get_etf_components` | ETF 구성종목과 비중 (상위 최대 200개) |
 | `get_fundamentals` | PER·PBR·EPS·BPS·시총·상장주식수·융자잔고비율 |
 | `get_dividend` | TTM 배당수익률 및 최근 배당 기록 |
 | `get_credit_ratio` | 신용 잔고율·공여율, 공매도 비중, 대차잔고 (ETF는 구성종목 가중평균) |
-| `advanced_search` | 종목 발굴/스크리닝 (KIS 랭킹 30건 또는 마스터파일 ~4300종목 풀, ETF 모드 자동 마스터풀) |
-| `find_symbol` | 종목명→종목코드 검색 (KOSPI+KOSDAQ 마스터 인덱스 기반, LLM 환각 방어) |
+| `advanced_search` | 종목 발굴/스크리닝 (KIS 랭킹 30건 또는 **마스터파일 ~4300종목 풀**, ETF 모드 자동 마스터풀) |
+| `find_symbol` | **종목명→종목코드 검색** (KOSPI+KOSDAQ 마스터 인덱스 기반, LLM 환각 방어용) |
 | `get_index` | 국내·해외 주요 지수 현재값 (KOSPI, KOSDAQ, S&P 500, NASDAQ 등) |
-| `get_index_chart` | 지수 OHLCV 시계열 |
+| `get_index_chart` | 지수 OHLCV 시계열 — 일/주/월/년 + **분봉**(국내 close-only / 해외 OHLC) |
 | `get_fx` | 주요 환율 현재값 (원/달러, 원/유로, 원/엔, 원/위안) |
 | `get_fx_chart` | 환율 OHLCV 시계열 |
 | `get_commodity` | 원자재 현재값 (WTI, Brent, 금) |
-| `get_commodity_chart` | 원자재 OHLCV 시계열 |
-| `get_overseas_stock_chart` | 해외 개별주식 OHLCV (NAS/NYS/TSE/HKS 등) — 일봉~분봉 |
+| `get_commodity_chart` | 원자재 OHLCV 시계열 — 일/주/월/년 + **선물 분봉**(WTI/Brent/금) |
+| `get_overseas_stock_chart` | **해외 개별주식 OHLCV** (NAS/NYS/AMS/TSE/HKS/SHS/SZS/HSX/HNX 9개 거래소) — 일봉~분봉 |
 
 각 도구의 입출력 스키마와 호출 예시는 [TOOLS.md](TOOLS.md)에 정리되어 있습니다.
+
+### 분봉 지원 요약
+
+| 대상 | 주기 옵션 | 한계 |
+|---|---|---|
+| 국내 주식/ETF (`get_chart`) | 1/3/5/10/15/30/60분 | 최대 5 영업일 (이상은 day로) |
+| 국내 업종지수 (`get_index_chart`) | 1/3/5/10/15/30/60분 | OHLC 없이 close만 (open=high=low=close), 당일만 |
+| 해외 지수 (`get_index_chart`) | 1/3/5/10/15/30/60분 | OHLC 있음, 단일 호출 |
+| 해외 선물 (`get_commodity_chart`) | 1/3/5/10/15/30/60분 | INDEX_KEY 페이지네이션 ≈ 1200 raw 1분봉 |
+| 해외 주식 (`get_overseas_stock_chart`) | 1/3/5/10/15/30/60분 | 최대 5 영업일, 페이지네이션 ≈ 3600 raw |
+
+> 분봉은 모두 1분봉을 base로 받아 클라이언트에서 N분봉으로 집계합니다 (open=첫봉 시가, close=마지막봉 종가, high/low=구간 최대/최소, volume=합).
 
 ---
 
@@ -147,6 +159,25 @@ npx wrangler deploy
 
 시크릿과 KV 데이터는 보존되며 URL도 변경되지 않습니다.
 
+### 7. 종목 인덱스 빌드 (선택, 갱신 시에만)
+
+`find_symbol`과 `advanced_search`의 마스터파일 풀이 사용하는 종목 인덱스(`src/data/symbolIndex.json`)는 저장소에 이미 포함되어 있어 **클론 직후 별도 작업 없이 동작**합니다.
+
+신규 상장이 반영된 최신 인덱스로 갱신하려면:
+
+```bash
+npm run build:index
+```
+
+이 명령은 한국투자증권 다운로드 서버에서 `kospi_code.mst.zip` + `kosdaq_code.mst.zip`(약 220KB)을 받아 cp949 fixed-width 레코드를 파싱한 뒤 JSON으로 변환합니다. 결과는 약 4,300종목(주식 ~2,700, ETF ~1,100, ETN ~400 등)을 담은 ~280KB JSON 파일로 저장됩니다.
+
+빌드 시점에 미리 변환해 워커 번들에 정적으로 내장하기 때문에, 런타임에는 ZIP 해제나 cp949 디코딩을 수행하지 않습니다 (Cloudflare Workers의 30초 wall-clock 보호).
+
+```bash
+npm run build:index   # 인덱스 갱신
+npx wrangler deploy   # 워커 재배포 (인덱스 변경분 반영)
+```
+
 ---
 
 ## 사용 방법
@@ -192,24 +223,58 @@ Streamable HTTP를 지원하는 클라이언트는 `/mcp` 엔드포인트도 사
 | 질문 | 호출되는 도구 |
 |---|---|
 | "삼성전자 현재가" | `get_quote("005930")` |
+| "삼성전자 종목코드" / "에코프로비엠 코드" | `find_symbol("삼성전자")` / `find_symbol("에코프로비엠")` |
 | "코스피 1년 차트" | `get_index_chart("KOSPI", "1Y")` |
+| "코스피 오늘 5분봉" | `get_index_chart("KOSPI", "minute", intervalMinutes=5)` |
+| "삼성전자 오늘 1분봉" | `get_chart("005930", "minute", intervalMinutes=1)` |
+| "테슬라 5분봉" | `get_overseas_stock_chart(market="NAS", symbol="TSLA", period="minute", intervalMinutes=5)` |
 | "원달러 환율" | `get_fx("USDKRW")` |
-| "WTI 가격" | `get_commodity("WTI")` |
+| "WTI 가격" / "WTI 5분봉" | `get_commodity("WTI")` / `get_commodity_chart("WTI", "minute", intervalMinutes=5)` |
 | "에코프로비엠 신용거래율" | `get_credit_ratio("247540")` |
-| "1년 수익률 최하위 ETF 10개" | `advanced_search(rankBy=return_1y, order=asc, ...)` |
+| "반도체 ETF 검색" | `advanced_search(rankBy=mcap, instrumentType=etf, sectorKeywords=["반도체"])` |
+| "1년 수익률 최하위 ETF 10개" | `advanced_search(rankBy=return_1y, order=asc, instrumentType=etf, enrichWithReturn=true)` |
+
+> **종목코드를 모를 때는 먼저 `find_symbol`로 확인하는 것을 권장합니다.** LLM이 코드를 추측하면 잘못된 코드를 생성할 수 있어 다른 도구가 엉뚱한 종목 정보를 반환할 수 있습니다.
 
 자주 쓰이는 복합 분석 시나리오(종목 신용 위험 분석, ETF 구성·위험 점검, 가치주·고배당 스크리닝 등)는 MCP Prompt로 캡슐화되어 있습니다. 자세한 내용은 [TOOLS.md](TOOLS.md)의 Prompts 섹션을 참고하세요.
 
 ---
 
+## 최근 추가된 주요 기능
+
+- **분봉 지원**: `get_chart`, `get_index_chart`, `get_commodity_chart`(선물), `get_overseas_stock_chart`에 1/3/5/10/15/30/60분 분봉 추가. 1분봉을 base로 받아 클라이언트에서 N분봉으로 집계.
+- **일봉 페이지네이션**: 한투 API의 호출당 100건 cap을 자동 페이지네이션으로 우회. 일봉을 ~8년치까지 한 번에 조회 가능 (이전엔 ~100건에서 silent 잘림).
+- **`get_overseas_stock_chart` 신규 도구**: 해외 개별주식 OHLCV (NAS/NYS/AMS/TSE/HKS/SHS/SZS/HSX/HNX 9개 거래소). 일봉~분봉 모두 지원.
+- **`find_symbol` 신규 도구**: KOSPI+KOSDAQ 마스터파일에서 추출한 ~4,300종목 인덱스로 종목명→종목코드 검색. LLM이 코드를 추측해 잘못된 종목 정보를 반환하는 문제를 방지.
+- **`advanced_search` 마스터파일 풀**: 기존 KIS 랭킹(호출당 30건 cap, 시총 상위만, ETF 거의 없음)의 한계를 우회. `instrumentType='etf'`이면 자동으로 마스터 풀(~1,500개 ETF)로 전환되어 ETF 검색이 실제로 작동.
+- **시장 지표 도구**: `get_index`/`get_index_chart`(KOSPI, KOSDAQ, S&P 500, NASDAQ 등), `get_fx`/`get_fx_chart`(USDKRW 등), `get_commodity`/`get_commodity_chart`(WTI, Brent, 금) — alias 입력 지원.
+- **API 문서 LLM 친화 변환**: 한국투자증권 OpenAPI 엑셀 명세(339시트)를 카테고리별 markdown으로 변환 (`docs/kis-api/`). LLM이 grep/read로 직접 탐색 가능.
+
+상세 변경 이력은 [GitHub commits](https://github.com/115dkk/KIS-MCP/commits/main)를 참고하세요.
+
+---
+
 ## 알려진 제한사항
 
+### 데이터 자체의 한계
 - **V-KOSPI(변동성 지수):** 한국투자증권 API에서 직접 제공하지 않아 조회할 수 없습니다.
 - **WTI/Brent 만기물 롤오버:** 만기물 자동 산출(만기 25일 전 다음 달 물로 전환)이 적용되는데, 전환 시점에서 가격 시계열에 갭이 발생할 수 있습니다.
 - **Brent 데이터 누락:** 한국투자증권 측 데이터 문제로 Brent(BRN) 만기물의 가격이 비어 있을 때가 있습니다. `sttl_price` → `prev_clpr` 순으로 자동 폴백하지만, 그래도 비는 경우 다른 만기물 코드를 직접 입력하거나 KODEX 브렌트원유선물 ETF로 우회할 수 있습니다.
-- **30초 wall-clock 제한:** Cloudflare Workers의 실행 시간 제한으로, `get_credit_ratio`(ETF 모드)나 `advanced_search`처럼 내부적으로 여러 API를 순차 호출하는 도구는 구성종목 수나 limit에 따라 시간이 걸릴 수 있습니다.
+- **국내 업종지수 분봉의 OHLC 부재:** `get_index_chart`의 분봉 모드에서 국내 지수(KOSPI 등)는 한투 endpoint가 close 값만 제공합니다. 응답에서 open/high/low를 close와 동일한 값으로 채워 반환합니다. 해외 지수 분봉은 OHLC 모두 정상 제공됩니다.
+
+### `advanced_search` / `find_symbol` (마스터파일 풀)
+- **시총·거래량·가격 데이터 없음:** 마스터파일에는 이런 데이터가 포함되지 않아, `useMasterPool=true` 또는 `instrumentType='etf'` 모드에서는 `minMcap` 필터가 무력하고 `rankBy=mcap/volume`이 가나다순으로 출력됩니다. 정확한 시총 정렬이 필요하면 `useMasterPool=false`로 KIS 랭킹(상위 30건만)을 사용하세요.
+- **enrichWithReturn 30건 cap:** 마스터 풀(~4,300종목)에서 모든 종목에 대해 수익률을 계산하면 워커 30초 제한을 넘기므로, 후보군 중 상위 30개만 실제 수익률을 계산해 재정렬합니다. 더 정확한 결과를 원하면 `sectorKeywords`로 후보를 좁히세요.
+- **신규 상장 반영 지연:** 마스터파일은 한투에서 일배치로 갱신되므로 신규 상장 종목은 다음 영업일 이후 인덱스에 반영됩니다. 갱신 후 `npm run build:index && npx wrangler deploy`로 새 인덱스를 배포하세요.
+
+### Cloudflare Workers 환경
+- **30초 wall-clock 제한:** Cloudflare Workers의 실행 시간 제한으로, `get_credit_ratio`(ETF 모드)나 `advanced_search`(마스터 풀 + enrichment)처럼 내부적으로 여러 API를 순차 호출하는 도구는 구성종목 수나 limit에 따라 시간이 걸릴 수 있습니다.
 - **실시간 웹소켓 미지원:** Cloudflare Workers 환경 특성상 한국투자증권의 실시간 시세 웹소켓 API는 지원하지 않습니다. 시세는 REST 호출로 조회합니다.
-- **한투 API 정기 점검:** 평일 새벽 및 주말 새벽에 한국투자증권 API가 점검에 들어가면 일시적으로 호출이 실패할 수 있습니다. MCP 서버 자체의 문제가 아닙니다.
+- **분봉 페이지네이션 상한:** 분봉은 호출 횟수가 빠르게 늘어나므로 안전장치로 페이지 상한이 설정되어 있습니다 (예: 해외주식 분봉 30회 ≈ 3,600 raw 1분봉, 해외선물 분봉 10회 ≈ 1,200 raw). 더 긴 기간이 필요하면 `intervalMinutes`를 키우거나 일봉으로 전환하세요.
+
+### 한투 API 자체
+- **정기 점검:** 평일 새벽 및 주말 새벽에 한국투자증권 API가 점검에 들어가면 일시적으로 호출이 실패할 수 있습니다. MCP 서버 자체의 문제가 아닙니다.
+- **랭킹 API 30건 cap:** `advanced_search`의 KIS 랭킹 모드(default)는 한투 API 자체가 호출당 30건만 반환하므로, 시총 30위 밖 종목은 검색되지 않습니다. 이를 우회하려면 `useMasterPool=true` 또는 `instrumentType='etf'`를 사용하세요(자동으로 마스터 풀 전환).
 
 이 외의 문제를 발견하시면 GitHub Issues로 알려주세요.
 
