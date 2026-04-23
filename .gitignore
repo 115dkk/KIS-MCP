@@ -1,0 +1,37 @@
+# Node / build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Wrangler
+.wrangler/
+
+# Local secrets (KIS API keys)
+.dev.vars
+.env
+.env.*
+!.dev.vars.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+
+# Claude Code per-project state (개인 설정/이력)
+.claude/
+
+# 한국투자증권 공식 샘플 MCP 코드 (참조용 로컬 클론, 본 저장소에 포함하지 않음)
+open-trading-api-main/
+
+# 로컬 wrangler 설정 (KV ID 등 계정별 값)
+wrangler.local.toml

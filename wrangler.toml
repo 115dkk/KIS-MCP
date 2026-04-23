@@ -1,0 +1,36 @@
+name = "kis-readonly-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-04-15"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[kv_namespaces]]
+binding = "KIS_TOKENS"
+# 본인의 Cloudflare 계정에서 생성한 KV 네임스페이스 ID로 교체:
+#   npx wrangler kv namespace create KIS_TOKENS
+#   npx wrangler kv namespace create KIS_TOKENS --preview
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_KV_PREVIEW_ID"
+
+[durable_objects]
+bindings = [
+  { name = "MCP_OBJECT", class_name = "KisMcpAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["KisMcpAgent"]
+
+[vars]
+KIS_BASE_URL = "https://openapi.koreainvestment.com:9443"
+
+# `agents` 패키지가 MCP 외 기능에서 `ai` (Vercel AI SDK)를 동적 import하지만
+# 본 워커는 사용하지 않으므로 stub으로 대체.
+[alias]
+"ai" = "./scripts/empty.mjs"
+
+# Secrets (set via `wrangler secret put`):
+#   KIS_APP_KEY
+#   KIS_APP_SECRET
