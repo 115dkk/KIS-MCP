@@ -147,6 +147,27 @@ export interface KisChartItem {
   revl_issu_reas?: string;
 }
 
+/**
+ * 주식일별분봉조회 (FHKST03010230) output2 항목. 1분봉.
+ * - stck_bsop_date: 영업일자 YYYYMMDD
+ * - stck_cntg_hour: 체결시간 HHMMSS (분봉 시작 시각)
+ * - stck_prpr: 해당 분봉 종가 (현재가가 아니라 그 분의 close)
+ * - cntg_vol: 해당 분봉 체결 거래량 (누적이 아님)
+ *
+ * 일봉용 KisChartItem과 필드명이 다르다: stck_clpr → stck_prpr, acml_vol → cntg_vol.
+ */
+export interface KisStockMinuteChartItem {
+  stck_bsop_date: string;
+  stck_cntg_hour: string;
+  stck_prpr: string;
+  stck_oprc: string;
+  stck_hgpr: string;
+  stck_lwpr: string;
+  cntg_vol: string;
+  acml_tr_pbmn?: string;
+  [key: string]: string | undefined;
+}
+
 export interface KisEtfComponentItem {
   hts_kor_isnm: string;
   stck_shrn_iscd: string;

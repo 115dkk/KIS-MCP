@@ -117,16 +117,42 @@
 
 ## `get_chart`
 
-**When to use:** OHLCV 시계열. 장기간일수록 `period=week/month`로 다운샘플 손실 줄이기.
+**When to use:** OHLCV 시계열. 일봉~연봉뿐 아니라 분봉(1/3/5/10/15/30/60분)도 지원.
 
 **Input:**
 - `symbol`: 6자리
-- `period`: `day` | `week` | `month` | `year`
+- `period`: `day` | `week` | `month` | `year` | `minute`
 - `startDate`, `endDate`: `YYYYMMDD` (옵션)
-- `adjusted`: 수정주가 여부 (기본 `true`)
-- `maxPoints`: 1~500 (기본 500)
+- `adjusted`: 수정주가 여부 (기본 `true`). day/week/month/year 전용
+- `maxPoints`: 1~2000 (기본 500)
+- `intervalMinutes`: `1`|`3`|`5`|`10`|`15`|`30`|`60` (기본 1, `period=minute` 전용)
 
-**Output:** `points: [{date, open, high, low, close, volume}]`. 500포인트 초과 시 `downsampledTo` 필드와 함께 균등 샘플링.
+**Output:**
+```json
+{
+  "symbol": "005930",
+  "period": "minute",
+  "intervalMinutes": 5,
+  "startDate": "20260423",
+  "endDate": "20260423",
+  "points": [
+    { "date": "2026-04-23 09:00:00", "open": 78500, "high": 78700, "low": 78400, "close": 78650, "volume": 124300 }
+  ],
+  "rawCount": 78,
+  "pagesFetched": 4
+}
+```
+
+**일봉/주봉/월봉/연봉**: KIS API는 호출당 100건 cap이라 페이지네이션 루프(최대 20회 ≈ 8년치)로 자동 확장. 페이지 상한 도달 시 `notes` 필드로 안내.
+
+**분봉**:
+- 기본 범위는 오늘 하루(약 391분 = 1분봉 기준 391포인트). 미지정 시 자동.
+- 최대 5 영업일까지 조회 가능 (그 이상은 `period=day`로).
+- 1분봉을 base로 받아 클라이언트에서 N분봉 집계 (open=첫봉시가, close=마지막봉종가, high/low=구간 max/min, volume=합).
+- 시간외 단일가(8:30 이전, 15:30 이후)는 분봉 일관성을 위해 제외.
+- 호출 횟수가 많아 워커 30s wall-clock 안에서 처리되도록 `intervalMinutes`를 키우면 빠름.
+
+**다운샘플링**: `rawCount > maxPoints`이면 균등 다운샘플 후 `downsampledTo` 필드 표시.
 
 ---
 

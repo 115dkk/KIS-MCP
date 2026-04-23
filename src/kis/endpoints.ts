@@ -21,6 +21,16 @@ export const KIS = {
     path: "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
     trIdReal: "FHKST03010100",
   },
+  /**
+   * 주식일별분봉조회. 1분봉 OHLCV. 호출당 약 120건 반환(2시간 분량).
+   * 페이지네이션: FID_INPUT_DATE_1 + FID_INPUT_HOUR_1 (HHMMSS) 기점으로 과거 방향.
+   * 다음 페이지는 직전 응답의 가장 이른 시각 - 1분으로 HOUR를 갱신.
+   * FID_PW_DATA_INCU_YN=Y로 과거 데이터 포함, FID_FAKE_TICK_INCU_YN="" (공백, 허봉 미포함).
+   */
+  stockMinuteChart: {
+    path: "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice",
+    trIdReal: "FHKST03010230",
+  },
 
   // Rankings
   fluctuationRank: {

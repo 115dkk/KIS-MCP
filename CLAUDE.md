@@ -324,3 +324,26 @@ Claude Code가 순차적으로 구현할 권장 순서:
 10. **문서화 및 테스트**
 
 각 단계 완료 후 `wrangler dev`로 실제 동작 확인하며 진행한다.
+
+---
+
+## 12. 코드 변경 후 배포 워크플로우 (필수)
+
+**이 프로젝트의 모든 코드 변경은 두 곳에 동시 반영해야 한다.** 둘 중 하나라도 빠지면 작업이 미완료 상태로 간주한다.
+
+1. **Cloudflare Workers 프로덕션 배포**
+   - `npm run typecheck` 통과 확인
+   - `npm run test` 통과 확인 (테스트가 있는 경우)
+   - 가능하면 `wrangler dev` 로컬 실행으로 변경된 도구 한 번 호출
+   - `npx wrangler deploy` → 프로덕션 워커 갱신
+
+2. **GitHub 저장소 push**
+   - `git add` (변경된 파일만 명시적으로 — `git add .`는 검토 후)
+   - `git commit -m "..."` (한 줄 제목 + 본문에 변경 이유 + 영향 범위)
+   - `git push origin main`
+
+순서는 워커 → GitHub을 권장한다. 워커 배포 실패 시 코드 자체에 문제가 있을 가능성이 높으므로 GitHub에는 작동 검증된 코드만 올라가도록 한다.
+
+`wrangler.toml`은 `git update-index --skip-worktree`로 추적이 일시 중단되어 있어 실제 KV namespace ID를 로컬에 유지하면서도 GitHub에는 placeholder가 push된다. wrangler.toml을 수정해야 할 일이 생기면 일시적으로 `--no-skip-worktree`로 추적을 켜고, placeholder 버전으로 커밋한 뒤, 다시 실제 ID로 복원 + `--skip-worktree` 재설정하는 사이클을 거친다.
+
+문서만 변경(README/SECURITY/TOOLS/CLAUDE 등)한 경우 워커 배포는 생략 가능하지만 GitHub push는 반드시 수행한다.
