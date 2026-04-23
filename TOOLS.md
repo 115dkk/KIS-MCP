@@ -328,7 +328,12 @@
 | 해외 | `DJI`, `DOW`, `DJIA`, `다우` | MRKT=N / ISCD=`.DJI` | dot prefix 필요 (한투 마스터) |
 
 **Input (`get_index`):** `{ symbol: string }`
-**Input (`get_index_chart`):** `{ symbol: string, period?: "1M"|"3M"|"6M"|"1Y"|"3Y"|"5Y"|"YTD", maxPoints?: 1~500 }`
+**Input (`get_index_chart`):** `{ symbol: string, period?: "1M"|"3M"|"6M"|"1Y"|"3Y"|"5Y"|"YTD"|"minute", maxPoints?: 1~500, intervalMinutes?: 1|3|5|10|15|30|60 }`
+
+**분봉 (`period="minute"`):**
+- 국내 지수(KOSPI/KOSDAQ/KOSPI200): `FHPUP02110200`. **OHLC 없이 close만** 제공 → open=high=low=close. 페이지네이션 미지원, 당일 데이터만.
+- 해외 지수(SPX/COMP/DJI 등): `FHKST03030200`. OHLC 있음. 페이지네이션 미지원.
+- intervalMinutes로 1분봉 베이스에서 N분봉 클라이언트 집계.
 
 **Output (`get_index`):**
 ```json
@@ -391,7 +396,9 @@
 **입력 형식 SRS_CD:** `<base><월코드 F~Z><2자리 연도>`. 월코드: F=1월, G=2월, H=3월, J=4월, K=5월, M=6월, N=7월, Q=8월, U=9월, V=10월, X=11월, Z=12월. 만기 25일 전부터 다음 달 만기물로 자동 롤오버.
 
 **Input (`get_commodity`):** `{ symbol: string }` — alias 또는 raw SRS_CD (예: `CLN26`).
-**Input (`get_commodity_chart`):** `{ symbol: string, period?: ..., maxPoints?: ... }`
+**Input (`get_commodity_chart`):** `{ symbol: string, period?: "1M"|"3M"|"6M"|"1Y"|"3Y"|"5Y"|"YTD"|"minute", maxPoints?: 1~500, intervalMinutes?: 1|3|5|10|15|30|60 }`
+
+**분봉 (`period="minute"`)**: 해외선물(`commodity-futures`)만 지원. `HHDFC55020400` + INDEX_KEY 페이지네이션(최대 10회 ≈ 1200 raw 1분봉). GOLD spot 모드는 분봉 endpoint 없음.
 
 **Output (`get_commodity`):**
 ```json
@@ -412,6 +419,41 @@
 **알려진 한계:**
 - **Brent**: 한투 응답에서 `last_price`가 비어 있을 수 있음 (만기물 활성도 추정). `sttl_price` → `prev_clpr` 순으로 자동 fallback. 모두 비면 raw SRS_CD로 다른 만기물 (`BRNM26`, `BRNN26`) 시도 또는 `KODEX 브렌트원유선물` ETF 활용.
 - **V-KOSPI 변동성지수**: 한투 직접 시세 없음. 미지원.
+
+---
+
+## `get_overseas_stock_chart`
+
+**When to use:** 해외 개별주식 (TSLA, AAPL, 7203 등) OHLCV 시계열.
+
+**Input:** `{ market, symbol, period, startDate?, endDate?, maxPoints?, intervalMinutes?, adjusted? }`
+
+| Param | 값 |
+|---|---|
+| `market` | `NAS`(나스닥) / `NYS`(뉴욕) / `AMS`(아멕스) / `TSE`(도쿄) / `HKS`(홍콩) / `SHS`(상해) / `SZS`(심천) / `HSX`(호치민) / `HNX`(하노이) |
+| `symbol` | 종목코드 (예: `TSLA`, `AAPL`, `MSFT`, `7203`) |
+| `period` | `day`/`week`/`month`/`minute` |
+| `intervalMinutes` | `1`/`3`/`5`/`10`/`15`/`30`/`60` (period=minute 전용) |
+| `adjusted` | day/week/month 전용 (기본 true) |
+
+**일봉/주봉/월봉**: `HHDFS76240000` + KEYB 페이지네이션 최대 10회 (≈ 1000 영업일 ≈ 4년).
+**분봉**: `HHDFS76950200` + NEXT/KEYB 페이지네이션 최대 30회 (페이지당 120건 ≈ 3600 raw 1분봉, 약 9 거래일분).
+- 분봉은 최대 5 영업일까지만 조회 가능 (그 이상은 `period=day`).
+- 시간은 **현지 시간**(xymd/xhms) 기준. 미국주식은 ET, 일본주식은 JST.
+
+**Output 예 (TSLA 5분봉):**
+```json
+{
+  "market": "NAS", "symbol": "TSLA", "period": "minute", "intervalMinutes": 5,
+  "rsym": "DNASTSLA", "priceDecimals": 4,
+  "startDate": "20260423", "endDate": "20260423",
+  "points": [
+    { "date": "2026-04-23 09:30:00", "open": 197.34, "high": 197.41, "low": 197.28, "close": 197.41, "volume": 5695 }
+  ],
+  "rawCount": 78, "pagesFetched": 1,
+  "source": "kis-overseas-stock"
+}
+```
 - **KRX 금현물**: 한투 미지원. COMEX 금선물(GC)로 우회.
 
 ---

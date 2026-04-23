@@ -10,7 +10,7 @@
 
 이 서버는 한국투자증권 OpenAPI의 조회 엔드포인트를 MCP 도구(tool)로 감싸서 노출합니다. LLM이 자연어 질문을 받으면 적절한 도구를 선택해 실시간 시장 데이터를 가져올 수 있습니다.
 
-### 도구 목록 (15개)
+### 도구 목록 (16개)
 
 | 도구 | 설명 |
 |---|---|
@@ -29,6 +29,7 @@
 | `get_fx_chart` | 환율 OHLCV 시계열 |
 | `get_commodity` | 원자재 현재값 (WTI, Brent, 금) |
 | `get_commodity_chart` | 원자재 OHLCV 시계열 |
+| `get_overseas_stock_chart` | 해외 개별주식 OHLCV (NAS/NYS/TSE/HKS 등) — 일봉~분봉 |
 
 각 도구의 입출력 스키마와 호출 예시는 [TOOLS.md](TOOLS.md)에 정리되어 있습니다.
 

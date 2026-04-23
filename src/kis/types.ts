@@ -326,6 +326,136 @@ export interface KisOverseasChartItem {
 }
 
 /**
+ * 국내업종 분봉 (FHPUP02110200) output 항목.
+ * **OHLC 없음**: bstp_nmix_prpr(close)만 제공. ChartPoint shape에 맞추려면 open=high=low=close.
+ */
+export interface KisIndexMinuteItem {
+  bsop_hour: string; // HHMMSS
+  bstp_nmix_prpr?: string; // 현재가 (close)
+  bstp_nmix_prdy_vrss?: string;
+  prdy_vrss_sign?: string;
+  bstp_nmix_prdy_ctrt?: string;
+  acml_tr_pbmn?: string;
+  acml_vol?: string;
+  cntg_vol?: string; // 해당 분봉 체결 거래량
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외지수 분봉 (FHKST03030200) output2 항목.
+ * 필드명 prefix가 'optn_' (option-style)이지만 지수 분봉이다.
+ */
+export interface KisOverseasIndexMinuteItem {
+  stck_bsop_date: string;
+  stck_cntg_hour: string; // HHMMSS (현지 시간)
+  optn_prpr?: string; // close
+  optn_oprc?: string;
+  optn_hgpr?: string;
+  optn_lwpr?: string;
+  cntg_vol?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 일봉 (HHDFS76240000) output2 항목.
+ * 필드명이 짧은 4자(KIS 해외시세 계열 통일).
+ */
+export interface KisOverseasStockDailyItem {
+  xymd: string; // YYYYMMDD
+  clos?: string; // 종가
+  open?: string;
+  high?: string;
+  low?: string;
+  tvol?: string; // 거래량
+  tamt?: string;
+  diff?: string;
+  rate?: string;
+  sign?: string;
+  pbid?: string;
+  pask?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 일봉 메타 (HHDFS76240000) output1.
+ * zdiv: 가격 소수점 자릿수 (응답값 그대로 사용 — KIS는 일봉 응답에서 소수점 보정 불필요).
+ */
+export interface KisOverseasStockDailyMeta {
+  rsym?: string; // D + 시장(3자) + 종목코드 (예: DNASTSLA)
+  zdiv?: string; // 소수점 자릿수
+  nrec?: string; // 레코드수
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 분봉 (HHDFS76950200) output2 항목.
+ * 시간 필드 두 가지:
+ *   - 현지: tymd(영업일자) / xymd(기준일자) / xhms(기준시간)
+ *   - 한국: kymd / khms
+ * 본 MCP는 현지 시간(xymd/xhms) 사용 — 사용자가 시장 흐름을 자연스럽게 인식.
+ */
+export interface KisOverseasStockMinuteItem {
+  tymd?: string;
+  xymd: string; // YYYYMMDD (현지)
+  xhms: string; // HHMMSS (현지)
+  kymd?: string;
+  khms?: string;
+  open?: string;
+  high?: string;
+  low?: string;
+  last?: string; // 종가 (close)
+  evol?: string;
+  eamt?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 분봉 메타 (HHDFS76950200) output1.
+ * next: "1" if 추가 데이터 있음 / nrec: 이번 응답 건수
+ */
+export interface KisOverseasStockMinuteMeta {
+  rsym?: string;
+  zdiv?: string;
+  stim?: string; // 장시작 현지시간
+  etim?: string; // 장종료 현지시간
+  sktm?: string; // 한국시간
+  ektm?: string;
+  next?: string; // "1": 다음 페이지 있음
+  more?: string;
+  nrec?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외선물 분봉 (HHDFC55020400) output1 항목.
+ * **주의**: 일봉 endpoint(HHDFC55020100)와 output1/output2 의미가 반전됨.
+ *   - 일봉: output1=메타, output2=배열
+ *   - 분봉: output1=배열, output2=메타 (ret_cnt, **index_key** for pagination)
+ * 가격은 sCalcDesz 보정 필요 (priceDecimals).
+ */
+export interface KisOverseasFuturesMinuteItem {
+  data_date?: string;
+  data_time?: string;
+  open_price?: string;
+  high_price?: string;
+  low_price?: string;
+  last_price?: string;
+  last_qntt?: string;
+  vol?: string;
+  prev_diff_flag?: string;
+  prev_diff_price?: string;
+  prev_diff_rate?: string;
+  [key: string]: string | undefined;
+}
+
+export interface KisOverseasFuturesMinuteMeta {
+  ret_cnt?: string;
+  last_n_cnt?: string;
+  index_key?: string; // 다음 페이지 키
+  [key: string]: string | undefined;
+}
+
+/**
  * 해외선물 현재가 (HHDFC55010000) output1.
  * "ffcode.mst의 sCalcDesz(계산 소수점) 값을 활용해서 가격을 재계산해야 한다"는
  * KIS 안내가 있으나 본 MCP는 값을 그대로 노출하고 단위를 displayName/unit에 명시.

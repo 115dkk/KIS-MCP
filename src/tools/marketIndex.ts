@@ -12,14 +12,18 @@ import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
 import type {
   KisIndexDailyChartItem,
+  KisIndexMinuteItem,
   KisIndexPriceOutput,
   KisOverseasChartItem,
   KisOverseasChartMeta,
+  KisOverseasIndexMinuteItem,
   KisResponse,
 } from "../kis/types.js";
-import type { ChartPoint } from "./chart.js";
+import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
 import { resolveAlias, type MarketAlias } from "../utils/marketCodes.js";
+
+const VALID_INTERVALS: IntervalMinutes[] = [1, 3, 5, 10, 15, 30, 60];
 
 /** 입력 파라미터 — alias 또는 raw ISCD 직접 입력 모두 허용 */
 export interface GetIndexInput {
@@ -55,13 +59,15 @@ export interface IndexResult {
   notes?: string[];
 }
 
-export type IndexPeriod = "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "YTD";
+export type IndexPeriod = "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "YTD" | "minute";
 
 export interface GetIndexChartInput {
   symbol: string;
   period?: IndexPeriod;
   /** 최대 반환 포인트 수 (기본 500, 상한 500) */
   maxPoints?: number;
+  /** 분봉 집계 단위 (period=minute일 때만). 기본 1 */
+  intervalMinutes?: IntervalMinutes;
 }
 
 export interface IndexChartResult {
@@ -70,6 +76,7 @@ export interface IndexChartResult {
   resolvedCode: string;
   category: "index-domestic" | "index-overseas";
   period: IndexPeriod;
+  intervalMinutes?: IntervalMinutes;
   startDate: string;
   endDate: string;
   points: ChartPoint[];
@@ -92,6 +99,9 @@ function periodToRange(period: IndexPeriod): { startDate: string; endDate: strin
   const today = new Date();
   const start = new Date(today);
   switch (period) {
+    case "minute":
+      // 분봉은 당일만 (range 의미 없음)
+      break;
     case "1M":
       start.setUTCMonth(start.getUTCMonth() - 1);
       break;
@@ -295,6 +305,19 @@ export async function getIndexChart(
   const range = periodToRange(period);
   const cap = Math.min(input.maxPoints ?? 500, 500);
 
+  if (period === "minute") {
+    const interval = input.intervalMinutes ?? 1;
+    if (!VALID_INTERVALS.includes(interval)) {
+      throw new Error(
+        `intervalMinutes는 ${VALID_INTERVALS.join("/")} 중 하나여야 합니다: ${interval}`,
+      );
+    }
+    if (alias.category === "index-domestic") {
+      return fetchDomesticIndexMinute(client, input.symbol, alias, range, cap, interval);
+    }
+    return fetchOverseasIndexMinute(client, input.symbol, alias, range, cap, interval);
+  }
+
   if (alias.category === "index-domestic") {
     const res = await client.get<KisIndexDailyChartItem[]>({
       path: KIS.indexDailyChart.path,
@@ -377,6 +400,8 @@ function domesticPeriodCode(period: IndexPeriod): string {
     case "3Y":
     case "5Y":
       return "M";
+    case "minute":
+      throw new Error("minute period는 별도 endpoint를 사용합니다 (이 함수 호출 금지)");
   }
 }
 
@@ -393,7 +418,150 @@ function overseasPeriodCode(period: IndexPeriod): string {
     case "3Y":
     case "5Y":
       return "M";
+    case "minute":
+      throw new Error("minute period는 별도 endpoint를 사용합니다 (이 함수 호출 금지)");
   }
+}
+
+// ─────────────────────── get_index_chart (분봉) ───────────────────────
+
+/**
+ * 국내 업종지수 분봉 (FHPUP02110200).
+ * - FID_INPUT_HOUR_1은 **초 단위** (60=1분, 300=5분 등). 1분봉을 받아서 클라이언트 집계.
+ * - 응답에 OHLC 없이 close만. high=low=open=close로 채움.
+ * - 페이지네이션 키 없음 → 단일 호출 (당일 데이터만, ~1시간~1영업일 분량).
+ */
+async function fetchDomesticIndexMinute(
+  client: KisClient,
+  inputSymbol: string,
+  alias: MarketAlias,
+  range: { startDate: string; endDate: string },
+  cap: number,
+  interval: IntervalMinutes,
+): Promise<IndexChartResult> {
+  const res = await client.get<KisIndexMinuteItem[]>({
+    path: KIS.indexMinuteChart.path,
+    trId: KIS.indexMinuteChart.trIdReal,
+    query: {
+      fid_cond_mrkt_div_code: alias.mrkt!,
+      fid_input_iscd: alias.iscd!,
+      fid_input_hour_1: "60", // 1분(60초)으로 받아 클라이언트 집계
+    },
+  });
+  const items = extractGenericArray<KisIndexMinuteItem>(res);
+  const today = new Date().toISOString().slice(0, 10);
+  const oneMin = items
+    .map((it) => domesticIndexMinuteToPoint(it, today))
+    .filter((p): p is ChartPoint => p !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const aggregated = interval > 1 ? aggregateMinutes(oneMin, interval) : oneMin;
+  const downsampled = downsample(aggregated, cap);
+  return {
+    input: inputSymbol,
+    name: alias.displayName,
+    resolvedCode: alias.iscd!,
+    category: "index-domestic",
+    period: "minute",
+    intervalMinutes: interval,
+    startDate: range.startDate,
+    endDate: range.endDate,
+    rawCount: aggregated.length,
+    downsampledTo: downsampled.length < aggregated.length ? downsampled.length : undefined,
+    points: downsampled,
+    source: "kis-domestic",
+    notes: [
+      "국내 업종지수 분봉 endpoint(FHPUP02110200)는 OHLC를 제공하지 않아 open=high=low=close로 채워집니다.",
+      "당일 데이터만 조회 가능 (페이지네이션 미지원).",
+    ],
+  };
+}
+
+/**
+ * 해외지수 분봉 (FHKST03030200).
+ * - HOUR_CLS=0(정규장), PW_DATA_INCU_YN=Y(과거 포함)
+ * - OHLC 있음 (optn_* 필드). 단일 호출.
+ */
+async function fetchOverseasIndexMinute(
+  client: KisClient,
+  inputSymbol: string,
+  alias: MarketAlias,
+  range: { startDate: string; endDate: string },
+  cap: number,
+  interval: IntervalMinutes,
+): Promise<IndexChartResult> {
+  const res = await client.get<KisOverseasIndexMinuteItem[]>({
+    path: KIS.overseasIndexMinuteChart.path,
+    trId: KIS.overseasIndexMinuteChart.trIdReal,
+    query: {
+      fid_cond_mrkt_div_code: alias.mrkt!,
+      fid_input_iscd: alias.iscd!,
+      fid_hour_cls_code: "0",
+      fid_pw_data_incu_yn: "Y",
+    },
+  });
+  const items = extractGenericArray<KisOverseasIndexMinuteItem>(res);
+  const oneMin = items
+    .map(overseasIndexMinuteToPoint)
+    .filter((p): p is ChartPoint => p !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const aggregated = interval > 1 ? aggregateMinutes(oneMin, interval) : oneMin;
+  const downsampled = downsample(aggregated, cap);
+  return {
+    input: inputSymbol,
+    name: alias.displayName,
+    resolvedCode: alias.iscd!,
+    category: "index-overseas",
+    period: "minute",
+    intervalMinutes: interval,
+    startDate: range.startDate,
+    endDate: range.endDate,
+    rawCount: aggregated.length,
+    downsampledTo: downsampled.length < aggregated.length ? downsampled.length : undefined,
+    points: downsampled,
+    source: "kis-overseas",
+    notes: [
+      "해외지수 분봉은 단일 호출로 받아오며 페이지네이션 미지원입니다 (한투 명세 기준).",
+      "시간은 현지 시간 기준입니다.",
+    ],
+  };
+}
+
+function domesticIndexMinuteToPoint(item: KisIndexMinuteItem, todayYmd: string): ChartPoint | null {
+  if (!item.bsop_hour) return null;
+  const close = parseNum(item.bstp_nmix_prpr);
+  if (!Number.isFinite(close) || close === 0) return null;
+  const h = item.bsop_hour.padStart(6, "0");
+  return {
+    date: `${todayYmd} ${h.slice(0, 2)}:${h.slice(2, 4)}:${h.slice(4, 6)}`,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: parseNum(item.cntg_vol) || 0,
+  };
+}
+
+function overseasIndexMinuteToPoint(item: KisOverseasIndexMinuteItem): ChartPoint | null {
+  if (!item.stck_bsop_date || !item.stck_cntg_hour) return null;
+  const close = parseNum(item.optn_prpr);
+  if (!Number.isFinite(close) || close === 0) return null;
+  const d = item.stck_bsop_date;
+  const h = item.stck_cntg_hour.padStart(6, "0");
+  return {
+    date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)} ${h.slice(0, 2)}:${h.slice(2, 4)}:${h.slice(4, 6)}`,
+    open: parseNum(item.optn_oprc) || close,
+    high: parseNum(item.optn_hgpr) || close,
+    low: parseNum(item.optn_lwpr) || close,
+    close,
+    volume: parseNum(item.cntg_vol) || 0,
+  };
+}
+
+function extractGenericArray<T>(res: KisResponse<T[]>): T[] {
+  for (const c of [res.output, res.output1, res.output2]) {
+    if (Array.isArray(c)) return c as T[];
+  }
+  return [];
 }
 
 // ─────────────────────── 응답 파서 ───────────────────────

@@ -29,6 +29,7 @@ import { ping } from "../tools/ping.js";
 import { getIndex, getIndexChart } from "../tools/marketIndex.js";
 import { getFx, getFxChart } from "../tools/fx.js";
 import { getCommodity, getCommodityChart } from "../tools/commodity.js";
+import { getOverseasStockChart } from "../tools/overseasStock.js";
 
 export interface KisEnv extends KisAuthEnv {}
 
@@ -55,9 +56,10 @@ const SERVER_INSTRUCTIONS = `한국투자증권(KIS) OpenAPI 기반 조회 전�
 
 [도구 선택 가이드 — 시장 지표 (alias 입력 권장)]
 - 지수 현재값 → get_index ("KOSPI"/"코스피", "KOSDAQ", "KOSPI200", "SPX"/"S&P500", "NASDAQ"/"COMP", "DJI" 등)
-- 지수 시계열 → get_index_chart (period: 1M/3M/6M/1Y/3Y/5Y/YTD)
+- 지수 시계열 → get_index_chart (period: 1M/3M/6M/1Y/3Y/5Y/YTD/minute. minute는 intervalMinutes 1~60)
 - 환율 → get_fx / get_fx_chart ("USDKRW"/"원달러", "EURKRW", "JPYKRW", "CNYKRW")
-- 원자재 → get_commodity / get_commodity_chart ("WTI", "BRENT"/"브렌트유", "GOLD"/"금")
+- 원자재 → get_commodity / get_commodity_chart ("WTI", "BRENT"/"브렌트유", "GOLD"/"금"). 분봉은 선물만 지원
+- **해외 개별주식** → get_overseas_stock_chart (market=NAS/NYS/AMS/TSE/HKS/SHS/SZS/HSX/HNX + symbol). day/week/month/minute 모두 지원
 - 변동성지수(V-KOSPI200): 한투 직접 시세 미제공. 미지원.
 
 [KIS 응답 단위 관습]
@@ -363,17 +365,29 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
     "get_index_chart",
     [
       "지수 OHLCV 시계열 (국내+해외 통합).",
-      "period: 1M/3M/6M는 일봉(D), 1Y는 주봉(W), 3Y/5Y는 월봉(M).",
+      "period: 1M/3M/6M는 일봉(D), 1Y는 주봉(W), 3Y/5Y는 월봉(M), 'minute'는 분봉.",
+      "분봉은 intervalMinutes(1/3/5/10/15/30/60)로 집계. 국내 분봉은 OHLC 없이 close만 (open=high=low=close).",
       "500포인트 초과 시 균등 다운샘플(downsampledTo 표시).",
-      "국내 일봉 API는 100건 cap → period가 너무 길면 자동으로 W/M 사용.",
     ].join(" "),
     {
       symbol: z.string().min(1).describe("지수 alias (KOSPI/SPX 등) 또는 raw ISCD"),
       period: z
-        .enum(["1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD"])
+        .enum(["1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD", "minute"])
         .optional()
-        .describe("기본 1Y"),
+        .describe("기본 1Y. minute는 당일 분봉"),
       maxPoints: z.number().int().min(1).max(500).optional().describe("최대 포인트 (기본·상한 500)"),
+      intervalMinutes: z
+        .union([
+          z.literal(1),
+          z.literal(3),
+          z.literal(5),
+          z.literal(10),
+          z.literal(15),
+          z.literal(30),
+          z.literal(60),
+        ])
+        .optional()
+        .describe("분봉 집계 단위 (period=minute일 때만, 기본 1)"),
     },
     async (args) => {
       try {
@@ -450,15 +464,82 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       "원자재 OHLCV 시계열.",
       "WTI/Brent는 해외선물 일간 체결 추이 (HHDFC55020100). 만기물 변경 구간 갭/점프 가능.",
       "GOLD는 chartprice(MRKT=S) 일/주/월.",
+      "period='minute'는 해외선물 분봉(HHDFC55020400, INDEX_KEY 페이지네이션). intervalMinutes로 집계.",
+      "**분봉은 commodity-futures(WTI/Brent/Gold)만 지원**, GOLD spot 모드(MRKT=S)에는 분봉 없음.",
     ].join(" "),
     {
       symbol: z.string().min(1).describe("원자재 alias 또는 raw 코드"),
-      period: z.enum(["1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD"]).optional().describe("기본 1Y"),
+      period: z
+        .enum(["1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD", "minute"])
+        .optional()
+        .describe("기본 1Y. minute는 분봉 (선물만)"),
       maxPoints: z.number().int().min(1).max(500).optional().describe("최대 포인트 (기본·상한 500)"),
+      intervalMinutes: z
+        .union([
+          z.literal(1),
+          z.literal(3),
+          z.literal(5),
+          z.literal(10),
+          z.literal(15),
+          z.literal(30),
+          z.literal(60),
+        ])
+        .optional()
+        .describe("분봉 집계 단위 (period=minute & 선물 전용, 기본 1)"),
     },
     async (args) => {
       try {
         return jsonContent(await getCommodityChart(client, args));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.tool(
+    "get_overseas_stock_chart",
+    [
+      "해외 개별주식 OHLCV 시계열 (NAS/NYS/AMS/TSE/HKS/SHS/SZS/HSX/HNX 거래소).",
+      "period: day/week/month는 일/주/월봉(HHDFS76240000, KEYB 페이지네이션 ≈ 4년).",
+      "period: minute은 1분봉 base(HHDFS76950200) + 클라이언트 N분 집계, 최대 5 영업일.",
+      "시간은 현지 시간(xymd/xhms) 기준. 미국주식은 ET 시간으로 표시됨.",
+      "사용 예: market='NAS', symbol='TSLA', period='minute', intervalMinutes=5",
+    ].join(" "),
+    {
+      market: z
+        .enum(["NAS", "NYS", "AMS", "TSE", "HKS", "SHS", "SZS", "HSX", "HNX"])
+        .describe("거래소 코드"),
+      symbol: z.string().min(1).max(16).describe("종목코드 (예: TSLA, AAPL, 7203)"),
+      period: z.enum(["day", "week", "month", "minute"]).describe("봉 단위"),
+      startDate: z.string().regex(/^\d{8}$/).optional().describe("YYYYMMDD"),
+      endDate: z.string().regex(/^\d{8}$/).optional().describe("YYYYMMDD. 미지정 시 오늘"),
+      adjusted: z
+        .boolean()
+        .optional()
+        .describe("수정주가 반영 (day/week/month 전용, 기본 true)"),
+      maxPoints: z
+        .number()
+        .int()
+        .min(1)
+        .max(2000)
+        .optional()
+        .describe("최대 포인트 (기본 500, 상한 2000)"),
+      intervalMinutes: z
+        .union([
+          z.literal(1),
+          z.literal(3),
+          z.literal(5),
+          z.literal(10),
+          z.literal(15),
+          z.literal(30),
+          z.literal(60),
+        ])
+        .optional()
+        .describe("분봉 집계 단위 (period=minute일 때만, 기본 1)"),
+    },
+    async (args) => {
+      try {
+        return jsonContent(await getOverseasStockChart(client, args));
       } catch (err) {
         return errorContent(err);
       }

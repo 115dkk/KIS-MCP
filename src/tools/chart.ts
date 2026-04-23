@@ -355,8 +355,10 @@ async function fetchMinuteChart(
  * 버킷 라벨(date)은 버킷 첫 봉 시각.
  *
  * 시간 경계는 일별로 리셋 (장 마감 ~ 다음날 장 시작 사이는 버킷 끊김).
+ *
+ * marketIndex/commodity/overseasStock 도구도 같은 패턴으로 재사용.
  */
-function aggregateMinutes(points: ChartPoint[], interval: IntervalMinutes): ChartPoint[] {
+export function aggregateMinutes(points: ChartPoint[], interval: IntervalMinutes): ChartPoint[] {
   if (interval === 1) return points;
   if (points.length === 0) return [];
   const result: ChartPoint[] = [];

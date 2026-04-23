@@ -107,6 +107,16 @@ export const KIS = {
     path: "/uapi/domestic-stock/v1/quotations/inquire-index-daily-price",
     trIdReal: "FHPUP02120000",
   },
+  /**
+   * 국내업종 시간별지수(분). FID_INPUT_HOUR_1은 **초 단위** (60=1분, 300=5분, 600=10분).
+   * 응답 output[]: bsop_hour(HHMMSS), bstp_nmix_prpr(close만), cntg_vol.
+   * **주의**: OHLC 없이 close만 반환. ChartPoint shape에 맞추려면 open=high=low=close로 채움.
+   * 페이지네이션 키 없음 → 단일 호출 (당일 데이터만).
+   */
+  indexMinuteChart: {
+    path: "/uapi/domestic-stock/v1/quotations/inquire-index-timeprice",
+    trIdReal: "FHPUP02110200",
+  },
 
   // ─── Overseas chart (다목적: 해외지수 N / 환율 X / 국채 I / 금선물 S) ───
   /**
@@ -122,6 +132,34 @@ export const KIS = {
   overseasChartPrice: {
     path: "/uapi/overseas-price/v1/quotations/inquire-daily-chartprice",
     trIdReal: "FHKST03030100",
+  },
+  /**
+   * 해외지수 분봉. MRKT=N(해외지수), HOUR_CLS=0(정규장)/1(시간외), PW_DATA_INCU_YN=Y(과거 포함).
+   * 응답 output1(메타) + output2[](stck_bsop_date, stck_cntg_hour, optn_prpr/oprc/hgpr/lwpr, cntg_vol).
+   * 단일 호출 (페이지네이션 키 명세에 없음).
+   */
+  overseasIndexMinuteChart: {
+    path: "/uapi/overseas-price/v1/quotations/inquire-time-indexchartprice",
+    trIdReal: "FHKST03030200",
+  },
+  /**
+   * 해외주식 일봉/주봉/월봉. EXCD(NAS/NYS/AMS/HKS/SHS/SZS/HSX/HNX/TSE),
+   * SYMB(종목코드), GUBN(0:일/1:주/2:월), BYMD(기준일자), MODP(0:미반영/1:수정주가).
+   * 응답 output1(rsym, zdiv, nrec) + output2[](xymd, clos, open, high, low, tvol).
+   * KEYB로 다음 페이지 (이전 응답값을 그대로 셋팅).
+   */
+  overseasStockDailyChart: {
+    path: "/uapi/overseas-price/v1/quotations/dailyprice",
+    trIdReal: "HHDFS76240000",
+  },
+  /**
+   * 해외주식 분봉. NMIN(분간격), PINC(0:당일/1:전일포함), NEXT/KEYB 페이지네이션, NREC(최대 120).
+   * 응답 output1(메타: stim/etim/sktm/ektm/next/more/nrec) + output2[](xymd, xhms, kymd, khms,
+   * open, high, low, last, evol, eamt). 다음 호출 시 KEYB=YYYYMMDDHHMMSS (마지막 분봉의 1분 전).
+   */
+  overseasStockMinuteChart: {
+    path: "/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice",
+    trIdReal: "HHDFS76950200",
   },
 
   // ─── Overseas futures (해외선물 — WTI/Brent 등 상품선물) ───
@@ -140,6 +178,16 @@ export const KIS = {
   overseasFuturesDailyChart: {
     path: "/uapi/overseas-futureoption/v1/quotations/daily-ccnl",
     trIdReal: "HHDFC55020100",
+  },
+  /**
+   * 해외선물 분봉. SRS_CD + EXCH_CD(CME) + QRY_GAP(분 간격) + QRY_CNT(최대 120) + INDEX_KEY(페이지네이션).
+   * 응답: output2(메타: ret_cnt, **index_key**) + output1[](data_date, data_time,
+   * open_price/high_price/low_price/last_price, vol). 일봉 endpoint와 output1/output2 의미 반전됨에 유의.
+   * 다음 페이지: QRY_TP=P + INDEX_KEY=직전 응답의 output2.index_key.
+   */
+  overseasFuturesMinuteChart: {
+    path: "/uapi/overseas-futureoption/v1/quotations/inquire-time-futurechartprice",
+    trIdReal: "HHDFC55020400",
   },
 } as const;
 

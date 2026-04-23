@@ -17,16 +17,21 @@ import type {
   KisOverseasChartItem,
   KisOverseasChartMeta,
   KisOverseasFuturesChartItem,
+  KisOverseasFuturesMinuteItem,
+  KisOverseasFuturesMinuteMeta,
   KisOverseasFuturesPriceOutput,
   KisResponse,
 } from "../kis/types.js";
-import type { ChartPoint } from "./chart.js";
+import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
 import {
   nearestFutureContract,
   resolveAlias,
   type MarketAlias,
 } from "../utils/marketCodes.js";
+
+const VALID_INTERVALS: IntervalMinutes[] = [1, 3, 5, 10, 15, 30, 60];
+const MAX_FUTURES_MINUTE_PAGES = 10; // 페이지당 최대 120건 → 최대 1200 raw points
 
 export interface GetCommodityInput {
   /** WTI, BRENT, GOLD 등 alias 또는 SRS_CD raw (예: CLM26) */
@@ -52,12 +57,14 @@ export interface CommodityResult {
   notes?: string[];
 }
 
-export type CommodityPeriod = "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "YTD";
+export type CommodityPeriod = "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "YTD" | "minute";
 
 export interface GetCommodityChartInput {
   symbol: string;
   period?: CommodityPeriod;
   maxPoints?: number;
+  /** 분봉 집계 단위 (period=minute일 때만, commodity-futures만 지원). 기본 1 */
+  intervalMinutes?: IntervalMinutes;
 }
 
 export interface CommodityChartResult {
@@ -66,11 +73,13 @@ export interface CommodityChartResult {
   resolvedCode: string;
   category: "commodity-futures" | "commodity-spot";
   period: CommodityPeriod;
+  intervalMinutes?: IntervalMinutes;
   startDate: string;
   endDate: string;
   points: ChartPoint[];
   rawCount: number;
   downsampledTo?: number;
+  pagesFetched?: number;
   unit?: string;
   source: "kis-overseas-futures" | "kis-overseas-chartprice";
   notes?: string[];
@@ -87,6 +96,9 @@ function periodToRange(period: CommodityPeriod): { startDate: string; endDate: s
   const today = new Date();
   const start = new Date(today);
   switch (period) {
+    case "minute":
+      // 분봉은 range 의미 없음. 페이지네이션이 종료일자(close) 기준 역방향이라 endDate=today만 의미.
+      break;
     case "1M":
       start.setUTCMonth(start.getUTCMonth() - 1);
       break;
@@ -312,6 +324,23 @@ export async function getCommodityChart(
   const range = periodToRange(period);
   const cap = Math.min(input.maxPoints ?? 500, 500);
 
+  if (period === "minute") {
+    if (alias.category !== "commodity-futures") {
+      throw new Error(
+        `분봉은 해외선물(commodity-futures)에서만 지원합니다. ` +
+          `'${input.symbol}'(${alias.category})은 한투에 분봉 endpoint가 없습니다. ` +
+          `period=1M 등 일봉 단위로 호출하세요.`,
+      );
+    }
+    const interval = input.intervalMinutes ?? 1;
+    if (!VALID_INTERVALS.includes(interval)) {
+      throw new Error(
+        `intervalMinutes는 ${VALID_INTERVALS.join("/")} 중 하나여야 합니다: ${interval}`,
+      );
+    }
+    return fetchFuturesMinuteChart(client, input.symbol, alias, resolvedCode, range, cap, interval);
+  }
+
   if (alias.category === "commodity-futures") {
     // 한투 daily-ccnl spec: SRS_CD + EXCH_CD + CLOSE_DATE_TIME + QRY_CNT (1회 최대 ~40건).
     // EXCH_CD는 srsBase에 따라 라우팅:
@@ -428,6 +457,8 @@ function periodCode(period: CommodityPeriod): string {
     case "3Y":
     case "5Y":
       return "M";
+    case "minute":
+      throw new Error("minute period는 별도 endpoint를 사용합니다 (이 함수 호출 금지)");
   }
 }
 
@@ -461,6 +492,135 @@ function itemToOverseasPoint(item: KisOverseasChartItem): ChartPoint | null {
     low: parseNum(item.ovrs_nmix_lwpr) || close,
     close,
     volume: parseNum(item.acml_vol) || 0,
+  };
+}
+
+/**
+ * 해외선물 분봉 (HHDFC55020400). INDEX_KEY 기반 페이지네이션.
+ * - 응답 output1=배열, output2=메타 (일봉 endpoint와 의미 반전됨에 유의)
+ * - QRY_TP=Q (최초) → P (다음, INDEX_KEY로 이전 응답의 키)
+ * - QRY_GAP=intervalMinutes로 직접 지정 (서버측 집계). 1분이 아니면 클라이언트 집계 불필요.
+ *   하지만 일관성을 위해 1분으로 받아서 클라이언트 집계 (집계 결과 동일성 + chart.ts 패턴 통일).
+ */
+async function fetchFuturesMinuteChart(
+  client: KisClient,
+  inputSymbol: string,
+  alias: MarketAlias,
+  resolvedCode: string,
+  range: { startDate: string; endDate: string },
+  cap: number,
+  interval: IntervalMinutes,
+): Promise<CommodityChartResult> {
+  const exchCd = exchangeForBase(alias.srsBase ?? resolvedCode);
+  const decimals = alias.priceDecimals ?? 0;
+  const minuteByKey = new Map<string, ChartPoint>();
+  let pages = 0;
+  let qryTp = "Q";
+  let indexKey = "";
+  const notes: string[] = [];
+
+  while (pages < MAX_FUTURES_MINUTE_PAGES) {
+    pages++;
+    const res = await client.get<KisOverseasFuturesMinuteItem[]>({
+      path: KIS.overseasFuturesMinuteChart.path,
+      trId: KIS.overseasFuturesMinuteChart.trIdReal,
+      query: {
+        srs_cd: resolvedCode,
+        exch_cd: exchCd,
+        start_date_time: "",
+        close_date_time: range.endDate,
+        qry_tp: qryTp,
+        qry_cnt: "120",
+        qry_gap: "1", // 1분으로 받아 클라이언트 집계
+        index_key: indexKey,
+      },
+    });
+
+    const items = extractFuturesMinuteItems(res);
+    if (items.length === 0) break;
+    let added = 0;
+    for (const it of items) {
+      const point = itemToFuturesMinutePoint(it, decimals);
+      if (!point) continue;
+      const key = `${it.data_date ?? ""}_${it.data_time ?? ""}`;
+      if (minuteByKey.has(key)) continue;
+      minuteByKey.set(key, point);
+      added++;
+    }
+
+    // 페이지네이션 키 추출 — output2가 메타 (일봉과 반대)
+    const meta = ((res.output2 as unknown) as Partial<KisOverseasFuturesMinuteMeta>) ?? {};
+    const nextKey = meta.index_key?.trim();
+    if (!nextKey || nextKey === indexKey || added === 0 || items.length < 120) break;
+    qryTp = "P";
+    indexKey = nextKey;
+  }
+
+  if (pages >= MAX_FUTURES_MINUTE_PAGES) {
+    notes.push(
+      `페이지네이션 상한(${MAX_FUTURES_MINUTE_PAGES}회)에 도달했습니다. 더 긴 범위는 endDate를 줄이거나 intervalMinutes를 키우세요.`,
+    );
+  }
+
+  const oneMin = Array.from(minuteByKey.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const aggregated = interval > 1 ? aggregateMinutes(oneMin, interval) : oneMin;
+  const downsampled = downsample(aggregated, cap);
+
+  return {
+    input: inputSymbol,
+    name: alias.displayName,
+    resolvedCode,
+    category: "commodity-futures",
+    period: "minute",
+    intervalMinutes: interval,
+    startDate: range.startDate,
+    endDate: range.endDate,
+    rawCount: aggregated.length,
+    downsampledTo: downsampled.length < aggregated.length ? downsampled.length : undefined,
+    points: downsampled,
+    pagesFetched: pages,
+    unit: alias.unit,
+    source: "kis-overseas-futures",
+    notes: [
+      `SRS_CD '${resolvedCode}' 만기물의 분봉입니다.`,
+      decimals > 0 ? `가격은 한투 raw / 10^${decimals} (sCalcDesz 보정)` : null,
+      ...notes,
+    ].filter((s): s is string => typeof s === "string" && s.length > 0),
+  };
+}
+
+function extractFuturesMinuteItems(
+  res: KisResponse<KisOverseasFuturesMinuteItem[]>,
+): KisOverseasFuturesMinuteItem[] {
+  // 분봉은 output1=배열 (일봉과 반대)
+  for (const c of [res.output1, res.output, res.output2]) {
+    if (Array.isArray(c)) return c as KisOverseasFuturesMinuteItem[];
+  }
+  return [];
+}
+
+function itemToFuturesMinutePoint(
+  item: KisOverseasFuturesMinuteItem,
+  priceDecimals: number,
+): ChartPoint | null {
+  if (!item.data_date || !item.data_time) return null;
+  const close = parseNum(item.last_price);
+  if (!Number.isFinite(close) || close === 0) return null;
+  const scale = 10 ** priceDecimals;
+  const adj = (s: string | undefined) => {
+    const n = parseNum(s);
+    return Number.isFinite(n) ? n / scale : NaN;
+  };
+  const closeAdj = close / scale;
+  const d = item.data_date;
+  const h = item.data_time.padStart(6, "0");
+  return {
+    date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)} ${h.slice(0, 2)}:${h.slice(2, 4)}:${h.slice(4, 6)}`,
+    open: adj(item.open_price) || closeAdj,
+    high: adj(item.high_price) || closeAdj,
+    low: adj(item.low_price) || closeAdj,
+    close: closeAdj,
+    volume: parseNum(item.vol) || 0,
   };
 }
 
