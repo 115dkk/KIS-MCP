@@ -10,7 +10,7 @@
 
 이 서버는 한국투자증권 OpenAPI의 조회 엔드포인트를 MCP 도구(tool)로 감싸서 노출합니다. LLM이 자연어 질문을 받으면 적절한 도구를 선택해 실시간 시장 데이터를 가져올 수 있습니다.
 
-### 도구 목록 (16개)
+### 도구 목록 (17개)
 
 | 도구 | 설명 |
 |---|---|
@@ -22,7 +22,8 @@
 | `get_fundamentals` | PER·PBR·EPS·BPS·시총·상장주식수·융자잔고비율 |
 | `get_dividend` | TTM 배당수익률 및 최근 배당 기록 |
 | `get_credit_ratio` | 신용 잔고율·공여율, 공매도 비중, 대차잔고 (ETF는 구성종목 가중평균) |
-| `advanced_search` | 시총·거래량·등락률 랭킹 기반 스크리닝 (인버스·레버리지 자동 제외) |
+| `advanced_search` | 종목 발굴/스크리닝 (KIS 랭킹 30건 또는 마스터파일 ~4300종목 풀, ETF 모드 자동 마스터풀) |
+| `find_symbol` | 종목명→종목코드 검색 (KOSPI+KOSDAQ 마스터 인덱스 기반, LLM 환각 방어) |
 | `get_index` | 국내·해외 주요 지수 현재값 (KOSPI, KOSDAQ, S&P 500, NASDAQ 등) |
 | `get_index_chart` | 지수 OHLCV 시계열 |
 | `get_fx` | 주요 환율 현재값 (원/달러, 원/유로, 원/엔, 원/위안) |

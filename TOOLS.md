@@ -4,6 +4,37 @@
 
 > **참고:** 각 도구의 "When to use" 가이드는 [server.ts](src/mcp/server.ts)의 `description`/`instructions`와 동일합니다. server.ts가 단일 진실원이고 본 문서는 그 미러입니다.
 
+## `find_symbol`
+
+**When to use:** 종목명에서 종목코드 찾기. **LLM이 코드를 추측하지 말고 이 도구로 확인할 것** (한투에는 이름→코드 검색 endpoint가 없으므로 빌드 시 KOSPI+KOSDAQ 마스터파일에서 추출한 ~4300종목 인덱스 사용).
+
+**Input:** `{ query: string, limit?: 1~50, types?: string[], markets?: ("KOSPI"|"KOSDAQ")[] }`
+
+**매칭 우선순위:**
+1. 6자리 숫자 → 코드 정확 매칭 (즉시)
+2. 종목명 정확 매칭 (정규화 후)
+3. 종목명 prefix 매칭
+4. 종목명 substring 매칭
+
+**types 분류 코드:** `ST`=주식, `EF`=ETF, `EN`=ETN, `RT`=REITs, `BC`=수익증권 등
+
+**Output 예 (`query="에코프로"`):**
+```json
+{
+  "query": "에코프로",
+  "matchedBy": "name-search",
+  "hits": [
+    { "code": "086520", "name": "에코프로", "type": "ST", "market": "KOSDAQ", "matchTier": 2 },
+    { "code": "247540", "name": "에코프로비엠", "type": "ST", "market": "KOSDAQ", "matchTier": 2 }
+  ],
+  "indexMeta": { "generatedAt": "2026-04-23T...", "totalRecords": 4330 }
+}
+```
+
+마스터는 일배치 갱신 → 신규 상장은 다음 영업일 반영. 인덱스 재생성: `npm run build:index` (한투 download server에서 .mst.zip 두 개 다시 다운로드 후 src/data/symbolIndex.json 갱신).
+
+---
+
 ## 종목코드 형식
 
 `symbol` 파라미터는 **1~12자 영숫자**. 입력 시 자동으로 trim + 대문자 변환됩니다.
@@ -276,6 +307,22 @@
 ---
 
 ## `advanced_search`
+
+> ⚠️ **두 가지 풀 모드**가 있고, 각각 한계가 다릅니다. 요구사항에 맞게 선택.
+
+### 풀 1: KIS 랭킹 (default for stock/both)
+- 후보군: KIS 시총·거래량·등락률 랭킹 **30건 cap** (한투 API 자체 제한)
+- 시총·거래량·등락률 데이터 포함
+- ETF 거의 미포함 (시총/거래량 TOP 30에 ETF 0~2개)
+- 시총 30위 밖 종목(예: 에코프로비엠) 검색 불가
+
+### 풀 2: 마스터파일 (자동 for `instrumentType='etf'` 또는 `useMasterPool=true`)
+- 후보군: KOSPI+KOSDAQ 마스터 **~4300종목** (주식 ~2700, ETF ~1100, ETN ~400)
+- 시총·거래량·가격 데이터 **없음** (마스터에 미포함) → minMcap 무력
+- 모든 ETF/소형주 검색 가능
+- `enrichWithReturn=true` 시 상위 30건에 대해 실제 수익률 계산 후 정렬 (워커 30s 보호)
+
+
 
 **When to use:** 시총/거래량/등락률 랭킹 기반 종목 발굴. 인버스/레버리지/혼합형/커버드콜/선물형 자동 제외. `rankBy=mcap`만 시총 데이터 포함하므로 `minMcap` 필터는 mcap 모드에서만 유효.
 

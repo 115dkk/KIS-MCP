@@ -21,6 +21,12 @@ import type { KisRankingItem, KisResponse } from "../kis/types.js";
 import { isExcludedByKeyword } from "../utils/filters.js";
 import { parseNum } from "../utils/downsample.js";
 import { isValidSymbol } from "../utils/symbol.js";
+import {
+  listByFilter,
+  type SymbolMarket,
+  type SymbolRecord,
+  type SymbolType,
+} from "../utils/symbolIndex.js";
 import { getReturn, type ReturnPeriod } from "./return.js";
 
 export type RankBy = "return_1y" | "return_6m" | "return_3m" | "return_1m" | "volume" | "mcap";
@@ -37,6 +43,13 @@ export interface AdvancedSearchInput {
   excludeOverseas?: boolean;
   /** When true, compute period return for top candidates (slower). */
   enrichWithReturn?: boolean;
+  /**
+   * 후보 풀을 KIS 랭킹(30건 cap, 시총 상위) 대신 마스터파일(KOSPI+KOSDAQ ~4300종목)에서 가져옴.
+   * - 시총·거래량 데이터는 master에 없으므로 rankBy=mcap/volume이면 enrichWithReturn 권장
+   * - sectorKeywords로 광범위 검색 가능 (예: "반도체" → 마스터 전체에서 매칭)
+   * - instrumentType='etf' 모드에서는 자동으로 true (KIS 랭킹에 ETF가 거의 없는 한계 우회)
+   */
+  useMasterPool?: boolean;
 }
 
 export interface AdvancedSearchHit {
@@ -80,6 +93,12 @@ export async function advancedSearch(
   const order = input.order ?? "desc";
   const instrumentType = input.instrumentType ?? "both";
   const notes: string[] = [];
+
+  // ETF 모드는 마스터파일 풀로 자동 전환 (KIS 랭킹 30건에 ETF가 거의 없음 → 항상 0건이던 문제 해결)
+  const useMasterPool = input.useMasterPool ?? instrumentType === "etf";
+  if (useMasterPool) {
+    return await advancedSearchViaMaster(client, input, instrumentType, limit, order, notes);
+  }
 
   let candidates: KisRankingItem[];
   if (input.rankBy === "mcap") {
@@ -279,4 +298,137 @@ function extractArray<T>(res: KisResponse<unknown>): T[] {
     if (Array.isArray(c)) return c as T[];
   }
   return [];
+}
+
+/**
+ * 마스터파일(KOSPI+KOSDAQ ~4300 종목) 기반 풀 검색.
+ *
+ * 작동 원리 (CLAUDE.md §12 워크플로우 + advanced_search 진단 보고 참조):
+ *   1. 마스터에서 instrumentType에 맞는 종목분류로 1차 필터 (ST/EF/EN)
+ *   2. excludeKeywords (기본 인버스/레버리지 등 + 사용자 추가) 제거
+ *   3. sectorKeywords (있으면) include 필터
+ *   4. enrichWithReturn=true이면 상위 N개에 대해 getReturn 호출 (rate-limit 보호 cap)
+ *   5. enrichment 결과로 정렬 (없으면 가나다순)
+ *
+ * KIS 랭킹과 차이점:
+ *   - 시총·거래량 데이터 없음 (마스터에 미포함) → minMcap/rankBy=mcap/volume이 무력
+ *     → enrichWithReturn=true와 rankBy=return_*만 의미 있음 (실제 수익률로 정렬)
+ *   - 풀 사이즈 무제한 (~4300) → 에코프로비엠/카카오 등 시총 30위 밖도 검색 가능
+ *   - ETF 검색이 실제로 작동 (~1500개 EF/EN 풀)
+ */
+async function advancedSearchViaMaster(
+  client: KisClient,
+  input: AdvancedSearchInput,
+  instrumentType: "stock" | "etf" | "both",
+  limit: number,
+  order: "asc" | "desc",
+  notes: string[],
+): Promise<AdvancedSearchResult> {
+  // 분류 매핑
+  const types: SymbolType[] =
+    instrumentType === "etf"
+      ? ["EF", "EN"]
+      : instrumentType === "stock"
+      ? ["ST"]
+      : ["ST", "EF", "EN"];
+
+  const markets: SymbolMarket[] = ["KOSPI", "KOSDAQ"];
+  const pool: SymbolRecord[] = listByFilter({ types, markets });
+  const pulled = pool.length;
+
+  notes.push(
+    `마스터파일 풀(${pulled}개, type=${types.join("/")}) 사용 — KIS 랭킹 30건 cap 우회.`,
+  );
+  if (input.minMcap !== undefined) {
+    notes.push(
+      "minMcap은 마스터 풀에서 무력합니다 (마스터에 시총 데이터 없음). " +
+        "정확한 시총 필터링이 필요하면 useMasterPool=false로 KIS 랭킹 사용.",
+    );
+  }
+
+  // 키워드 필터
+  const filtered = pool.filter((rec) => {
+    const name = rec.name;
+    if (
+      isExcludedByKeyword(name, {
+        extraKeywords: input.excludeKeywords,
+        excludeOverseas: input.excludeOverseas,
+      })
+    ) {
+      return false;
+    }
+    if (input.sectorKeywords && input.sectorKeywords.length > 0) {
+      const upper = name.toUpperCase();
+      if (!input.sectorKeywords.some((k) => upper.includes(k.toUpperCase()))) return false;
+    }
+    return true;
+  });
+
+  // baseHits에 매핑 — 가격/시총/거래량은 master에 없음 (NaN/undefined)
+  let hits: AdvancedSearchHit[] = filtered.map((rec, i) => ({
+    symbol: rec.code,
+    name: rec.name,
+    price: NaN,
+    changeRate: NaN,
+    rankFromKis: i + 1,
+  }));
+
+  // enrichment: rankBy=return_*에서 의미 있음. 마스터 풀이 크므로 호출 보호.
+  const period = RANK_RETURN_TO_PERIOD[input.rankBy];
+  const ENRICH_CAP = 30; // rate-limit + 30s wall-clock 안전 마진
+  if (input.enrichWithReturn && period) {
+    const targets = hits.slice(0, Math.min(filtered.length, ENRICH_CAP));
+    if (targets.length < filtered.length) {
+      notes.push(
+        `enrichWithReturn 대상이 ${ENRICH_CAP}건으로 제한됩니다 (워커 30s wall-clock 보호). ` +
+          `더 좁은 후보가 필요하면 sectorKeywords로 필터링하세요.`,
+      );
+    }
+    const enriched: AdvancedSearchHit[] = [];
+    for (const hit of targets) {
+      try {
+        const ret = await getReturn(client, { symbol: hit.symbol, period });
+        enriched.push({
+          ...hit,
+          price: ret.endPrice ?? NaN,
+          enrichedReturnPct: ret.absoluteReturnPct,
+          enrichedReturnPeriod: period,
+        });
+      } catch {
+        enriched.push(hit);
+      }
+    }
+    enriched.sort((a, b) => {
+      const av = a.enrichedReturnPct;
+      const bv = b.enrichedReturnPct;
+      if (av === undefined && bv === undefined) return 0;
+      if (av === undefined) return 1;
+      if (bv === undefined) return -1;
+      return order === "asc" ? av - bv : bv - av;
+    });
+    hits = enriched.slice(0, limit);
+    notes.push(`상위 ${hits.length}개에 대해 ${period} 수익률 계산 후 정렬.`);
+  } else {
+    // 정렬 없이 가나다순 (마스터 풀의 deterministic 출력)
+    hits = hits.slice(0, limit);
+    if (period && !input.enrichWithReturn) {
+      notes.push(
+        `rankBy=${input.rankBy}이지만 enrichWithReturn=false → 실제 수익률 계산 없이 마스터 순(가나다)으로 반환. ` +
+          `정확한 수익률 정렬이 필요하면 enrichWithReturn=true.`,
+      );
+    } else if (input.rankBy === "mcap" || input.rankBy === "volume") {
+      notes.push(
+        `rankBy=${input.rankBy}은 마스터 풀에서 의미가 없습니다 (시총/거래량 데이터 없음). ` +
+          `KIS 랭킹 사용을 원하면 useMasterPool=false 명시.`,
+      );
+    }
+  }
+
+  return {
+    query: input,
+    pulled,
+    afterFilters: filtered.length,
+    hits,
+    notes,
+  };
 }
