@@ -492,6 +492,115 @@ export interface KisOverseasFuturesChartItem {
 }
 
 /**
+ * 해외주식 현재체결가 (HHDFS00000300) output. 단일 객체.
+ * OHLC/52주 고저 없음 — 더 풍부한 정보가 필요하면 multprice (M2).
+ */
+export interface KisOverseasStockPriceOutput {
+  rsym?: string; // D + 시장(3) + 종목 (예: DNASTSLA)
+  zdiv?: string; // 소수점 자리수
+  base?: string; // 전일 종가
+  pvol?: string; // 전일 거래량
+  last?: string; // 현재가
+  sign?: string; // 대비기호 1:상한 2:상승 3:보합 4:하한 5:하락
+  diff?: string; // 전일대비
+  rate?: string; // 등락율 %
+  tvol?: string; // 당일 거래량
+  tamt?: string; // 당일 거래대금
+  ordy?: string; // 매수가능여부
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 복수종목 시세조회 (HHDFS76220000) output2 항목.
+ * NREC=1로 단일 종목 모드 호출 시 풍부한 시세 정보 (OHLC + 52주 + 시총 + 상장주수).
+ */
+export interface KisOverseasStockMultiPriceItem {
+  rsym?: string;
+  excd?: string;
+  symb?: string;
+  knam?: string; // 종목명 (한국어)
+  exnm?: string; // 거래소명
+  nnam?: string; // 국가명
+  zdiv?: string;
+  last?: string;
+  sign?: string;
+  diff?: string;
+  rate?: string;
+  open?: string;
+  high?: string;
+  low?: string;
+  pbid?: string;
+  pask?: string;
+  tvol?: string;
+  tamt?: string;
+  curr?: string; // 통화
+  base?: string;
+  pvol?: string;
+  pamt?: string;
+  popen?: string;
+  phigh?: string;
+  plow?: string;
+  shar?: string; // 상장주식수
+  mcap?: string; // 자본금
+  tomv?: string; // 시가총액
+  h52p?: string; // 52주 최고가
+  l52p?: string; // 52주 최저가
+  h52d?: string; // 52주 최고일자 (YYYYMMDD)
+  l52d?: string;
+  hanp?: string; // 연중 최고가
+  lanp?: string; // 연중 최저가
+  hand?: string;
+  land?: string;
+  bnit?: string; // 매매단위
+  t_xprc?: string; // 원환산 당일가격
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 복수종목 시세조회 (HHDFS76220000) output1.
+ */
+export interface KisOverseasStockMultiPriceMeta {
+  nrec?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * 해외주식 상품기본정보 (CTPF1702R) output.
+ * PER/EPS/시총은 미포함 (search-info는 상품 메타 + 상장 정보만).
+ * PER/EPS는 inquire-search(HHDFS76410000) 또는 multprice를 별도 사용.
+ */
+export interface KisOverseasStockSearchInfoOutput {
+  std_pdno?: string; // ISIN (예: US0378331005)
+  prdt_eng_name?: string; // 영문 상품명
+  prdt_name?: string; // 한국어 상품명
+  natn_cd?: string;
+  natn_name?: string;
+  tr_mket_name?: string; // 거래시장명 (예: 나스닥)
+  ovrs_excg_cd?: string;
+  ovrs_excg_name?: string;
+  tr_crcy_cd?: string; // 통화 코드 (USD/JPY/HKD 등)
+  crcy_name?: string;
+  ovrs_papr?: string; // 액면가
+  ovrs_stck_dvsn_cd?: string; // 01.주식 02.WARRANT 03.ETF 04.우선주
+  ovrs_stck_etf_risk_drtp_cd?: string; // 001.ETF 002.ETN 003.ETC 004.REITs/MF 005.VIX-ETF 006.VIX-ETN
+  prdt_clsf_name?: string;
+  lstg_stck_num?: string; // 상장 주식수
+  lstg_dt?: string; // 상장 일자 YYYYMMDD
+  lstg_yn?: string;
+  lstg_abol_item_yn?: string;
+  lstg_abol_dt?: string;
+  ovrs_stck_tr_stop_dvsn_cd?: string; // 01.정상 02.정지 03.중단 등
+  tax_levy_yn?: string;
+  sedol_no?: string;
+  blbg_tckr_text?: string; // 블룸버그 티커
+  ovrs_item_name?: string;
+  ptp_item_yn?: string;
+  ptp_item_trfx_exmt_yn?: string;
+  dtm_tr_psbl_yn?: string;
+  [key: string]: string | undefined;
+}
+
+/**
  * 랭킹 응답은 엔드포인트마다 종목코드/시총 필드명이 다르다.
  *   - fluctuation: stck_shrn_iscd (시총·거래대금 없음)
  *   - market-cap : mksc_shrn_iscd, stck_avls

@@ -12,6 +12,13 @@
 
 import { KisAuth, type KisAuthEnv } from "./auth.js";
 import { kisRateLimiter } from "../utils/ratelimit.js";
+import {
+  bumpBypass,
+  buildCacheKey,
+  classifyTtl,
+  getFromCache,
+  putToCache,
+} from "../utils/responseCache.js";
 import type { KisResponse } from "./types.js";
 
 export interface KisGetOptions {
@@ -25,6 +32,11 @@ export interface KisGetOptions {
   trCont?: string;
   /** Optional custgtype header (P=개인, B=법인). Defaults to P. */
   custgType?: string;
+  /**
+   * 응답 캐시 우회 (M4). 페이지네이션 중간 호출이나 디버깅 시 사용.
+   * 기본 false (캐시 사용).
+   */
+  skipCache?: boolean;
 }
 
 const REQUEST_TIMEOUT_MS = 25_000;
@@ -45,6 +57,13 @@ export class KisApiError extends Error {
 export class KisClient {
   private readonly auth: KisAuth;
   private lastCallAt = 0;
+  /**
+   * KV 인스턴스 — 응답 캐싱(M4)에 사용. KisAuthEnv의 KIS_TOKENS와 동일 namespace 재사용.
+   * (응답 캐시 키는 'kis:resp:' prefix이고 토큰 키는 'kis:access_token:'이라 충돌 없음.)
+   */
+  private get kv(): KVNamespace {
+    return this.env.KIS_TOKENS;
+  }
 
   constructor(private readonly env: KisAuthEnv) {
     this.auth = new KisAuth(env);
@@ -60,8 +79,25 @@ export class KisClient {
 
   /**
    * GET helper that handles auth, rate limiting, retries, and error normalization.
+   *
+   * M4: 캐시 레이어 통합. 캐시 히트 시 레이트 리미터를 소비하지 않음.
+   * skipCache=true / trCont 페이지네이션 / rt_cd!=0 / 빈 응답은 캐싱 우회.
    */
   async get<TOutput = unknown>(opts: KisGetOptions): Promise<KisResponse<TOutput>> {
+    // ── M4: 캐시 조회 ──
+    let cacheKey: string | null = null;
+    let ttl: { logicalSec: number; kvSec: number } | null = null;
+    if (!opts.skipCache && !opts.trCont) {
+      cacheKey = await buildCacheKey(opts.path, opts.query, opts.trId);
+      ttl = classifyTtl(opts.path);
+      const hit = await getFromCache<KisResponse<TOutput>>(this.kv, cacheKey);
+      if (hit) {
+        return hit;
+      }
+    } else {
+      bumpBypass();
+    }
+
     let token = await this.auth.getAccessToken();
     let attempt = 0;
     let authRetried = false;
@@ -109,6 +145,26 @@ export class KisClient {
           continue;
         }
         throw new KisApiError(response.status, data.msg_cd, data.msg1 || "KIS 응답 오류", data);
+      }
+
+      // ── M4: 성공 응답 캐싱 ──
+      if (cacheKey && ttl) {
+        // ETF 구성종목 비결정적 빈 응답(M0-9)은 캐싱하면 안 됨 — output이 모두 비어 있으면 우회.
+        // 그래야 다음 호출에 정상 데이터가 잡힐 수 있음.
+        const outputs: unknown[] = [data.output, data.output1, data.output2];
+        const hasContent = outputs.some(
+          (o) =>
+            (Array.isArray(o) && o.length > 0) ||
+            (o !== null &&
+              o !== undefined &&
+              typeof o === "object" &&
+              !Array.isArray(o) &&
+              Object.keys(o as Record<string, unknown>).length > 0),
+        );
+        if (hasContent) {
+          // fire-and-forget: KV put이 늦어도 응답은 즉시 반환
+          void putToCache(this.kv, cacheKey, data, ttl.logicalSec, ttl.kvSec);
+        }
       }
 
       return data;

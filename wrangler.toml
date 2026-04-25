@@ -6,13 +6,18 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+# Cron Trigger (M5): 매일 UTC 07:00 = KST 16:00에 마스터 인덱스를 KV에 갱신.
+# 한투 새 상장 발효는 보통 다음 영업일 오전이라 장 마감 후 시점에 갱신.
+[triggers]
+crons = ["0 7 * * *"]
+
 [[kv_namespaces]]
 binding = "KIS_TOKENS"
 # 본인의 Cloudflare 계정에서 생성한 KV 네임스페이스 ID로 교체:
 #   npx wrangler kv namespace create KIS_TOKENS
 #   npx wrangler kv namespace create KIS_TOKENS --preview
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_YOUR_KV_PREVIEW_ID"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
 
 [durable_objects]
 bindings = [

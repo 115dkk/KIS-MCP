@@ -29,6 +29,7 @@ import {
   type SymbolRecord,
   type SymbolType,
 } from "../utils/symbolIndex.js";
+import { getFundamentals } from "./fundamentals.js";
 import { getReturn, type ReturnPeriod } from "./return.js";
 
 export type RankBy = "return_1y" | "return_6m" | "return_3m" | "return_1m" | "volume" | "mcap";
@@ -48,6 +49,16 @@ export interface AdvancedSearchInput {
   /** When true, compute period return for top candidates (slower). */
   enrichWithReturn?: boolean;
   /**
+   * 후보별 PER/PBR을 추가 조회하고 maxPer/maxPbr 필터를 적용 (M1).
+   * 가치주 스크리닝(screen_value_stocks Prompt) 핵심 옵션.
+   * 후보 상위 ENRICH_CAP(30)건에 대해 batchParallel(batch=5) 호출.
+   */
+  enrichWithFundamentals?: boolean;
+  /**
+   * PBR 상한. enrichWithFundamentals=true일 때만 유효.
+   */
+  maxPbr?: number;
+  /**
    * 후보 풀을 KIS 랭킹(30건 cap, 시총 상위) 대신 마스터파일(KOSPI+KOSDAQ ~4300종목)에서 가져옴.
    * - 시총·거래량 데이터는 master에 없으므로 rankBy=mcap/volume이면 enrichWithReturn 권장
    * - sectorKeywords로 광범위 검색 가능 (예: "반도체" → 마스터 전체에서 매칭)
@@ -66,6 +77,9 @@ export interface AdvancedSearchHit {
   rankFromKis?: number;
   enrichedReturnPct?: number;
   enrichedReturnPeriod?: ReturnPeriod;
+  /** M1: enrichWithFundamentals=true 시 채워짐 */
+  enrichedPer?: number;
+  enrichedPbr?: number;
 }
 
 export interface AdvancedSearchResult {
@@ -214,6 +228,17 @@ export async function advancedSearch(
     notes.push(`상위 ${trimmed.length}개에 대해 ${period} 수익률을 병렬 계산 (batch=5)`);
   }
 
+  // M1: PER/PBR enrichment + maxPer/maxPbr 필터.
+  if (input.enrichWithFundamentals) {
+    trimmed = await enrichFundamentalsAndFilter(
+      client,
+      trimmed,
+      input.maxPer,
+      input.maxPbr,
+      notes,
+    );
+  }
+
   return {
     query: input,
     pulled,
@@ -221,6 +246,52 @@ export async function advancedSearch(
     hits: trimmed,
     notes,
   };
+}
+
+/**
+ * M1: 후보 hits에 PER/PBR 추가 + maxPer/maxPbr 필터.
+ *
+ * - batchParallel(batch=5)로 getFundamentals 호출
+ * - 호출 실패한 종목은 필터에서 통과시킴 (보수적 — 데이터 부재로 잘못 제거 방지)
+ * - 필터 통과만 남김
+ */
+async function enrichFundamentalsAndFilter(
+  client: KisClient,
+  hits: AdvancedSearchHit[],
+  maxPer: number | undefined,
+  maxPbr: number | undefined,
+  notes: string[],
+): Promise<AdvancedSearchHit[]> {
+  if (hits.length === 0) return hits;
+
+  const batchResults = await batchParallel(
+    hits,
+    (hit) => getFundamentals(client, { symbol: hit.symbol }),
+    5,
+  );
+  const enriched: AdvancedSearchHit[] = batchResults.map(({ item, result }) =>
+    result
+      ? { ...item, enrichedPer: result.per, enrichedPbr: result.pbr }
+      : item,
+  );
+
+  let pre = enriched.length;
+  const filtered = enriched.filter((hit) => {
+    if (maxPer !== undefined && hit.enrichedPer !== undefined && hit.enrichedPer > maxPer) {
+      return false;
+    }
+    if (maxPbr !== undefined && hit.enrichedPbr !== undefined && hit.enrichedPbr > maxPbr) {
+      return false;
+    }
+    return true;
+  });
+  notes.push(
+    `상위 ${pre}개에 대해 PER/PBR 병렬 enrichment (batch=5)` +
+      (maxPer !== undefined || maxPbr !== undefined
+        ? ` → maxPer=${maxPer ?? "∞"}/maxPbr=${maxPbr ?? "∞"} 필터 후 ${filtered.length}건`
+        : ""),
+  );
+  return filtered;
 }
 
 async function fetchFluctuationRanking(
@@ -418,6 +489,18 @@ async function advancedSearchViaMaster(
           `KIS 랭킹 사용을 원하면 useMasterPool=false 명시.`,
       );
     }
+  }
+
+  // M1: PER/PBR enrichment 마스터 풀에서도 적용.
+  // enrichWithReturn=true와 동시 사용 시 enrichWithReturn 후 결과(이미 30건 이내)에 적용됨.
+  if (input.enrichWithFundamentals) {
+    hits = await enrichFundamentalsAndFilter(
+      client,
+      hits,
+      input.maxPer,
+      input.maxPbr,
+      notes,
+    );
   }
 
   return {

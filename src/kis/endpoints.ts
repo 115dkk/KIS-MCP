@@ -162,6 +162,39 @@ export const KIS = {
     trIdReal: "HHDFS76950200",
   },
 
+  // ─── Overseas stock quote / info (M2) ───
+  /**
+   * 해외주식 현재체결가. EXCD + SYMB.
+   * 응답 output: rsym, zdiv, base, pvol, last, sign, diff, rate, tvol, tamt, ordy.
+   * **OHLC/52주 고저 없음** — 그게 필요하면 overseasStockMultiPrice 사용.
+   */
+  overseasStockPrice: {
+    path: "/uapi/overseas-price/v1/quotations/price",
+    trIdReal: "HHDFS00000300",
+  },
+  /**
+   * 해외주식 복수종목 시세조회. EXCD_01..10 + SYMB_01..10 + NREC.
+   * 단일 종목 모드(NREC=1)로 호출하면 OHLC, 52주 고저, 시총, 상장주식수, EPS/PER 미포함이지만
+   * 시가/고가/저가, 52주 최고/최저, 상장주수, 시가총액 등 풍부한 정보 제공.
+   * get_overseas_stock_quote의 1차 데이터 소스.
+   */
+  overseasStockMultiPrice: {
+    path: "/uapi/overseas-price/v1/quotations/multprice",
+    trIdReal: "HHDFS76220000",
+  },
+  /**
+   * 해외주식 상품기본정보. PRDT_TYPE_CD + PDNO.
+   * PRDT_TYPE_CD 매핑: 512=NAS, 513=NYS, 529=AMS, 515=TSE, 501=HKS, 543=HKS-CNY, 558=HKS-USD,
+   *                   507=HNX, 508=HSX, 551=SHS, 552=SZS.
+   * 응답 output: prdt_name(한국어), prdt_eng_name(영문), ovrs_excg_name(거래소),
+   *   tr_crcy_cd(통화), lstg_stck_num(상장주식수), lstg_dt(상장일자),
+   *   ovrs_stck_dvsn_cd(01.주식/03.ETF/04.우선주), ovrs_stck_etf_risk_drtp_cd(001.ETF/002.ETN/005.VIX) 등.
+   */
+  overseasStockSearchInfo: {
+    path: "/uapi/overseas-price/v1/quotations/search-info",
+    trIdReal: "CTPF1702R",
+  },
+
   // ─── Overseas futures (해외선물 — WTI/Brent 등 상품선물) ───
   /**
    * 해외선물 현재가. SRS_CD = base + 월코드(F~Z) + 2자리 연도 (예: CLM26).

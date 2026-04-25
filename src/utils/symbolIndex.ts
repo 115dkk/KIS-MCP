@@ -154,6 +154,44 @@ export function findByName(query: string, options: FindByNameOptions = {}): Name
   return [...tier1, ...tier2, ...tier3].slice(0, limit);
 }
 
+/**
+ * KV에 정적 인덱스를 저장 (M5 scheduled handler용).
+ * 매일 cron이 호출하여 worker isolate 재시작 시점과 무관하게 KV에 항상 최신 보장.
+ *
+ * 본 함수는 static import된 indexJson을 그대로 KV에 저장. Workers에서 cp949 디코딩이
+ * 불가능하므로(ICU 미포함) 한투 마스터 직접 fetch는 불가. 빌드 시점에 미리 가공한
+ * 정적 JSON을 KV에 동기화하는 패턴으로 우회한다.
+ *
+ * 추후 cp949 디코더가 워커에 포함되면 이 함수를 한투 master fetch 로직으로 교체.
+ */
+export async function syncSymbolIndexToKv(kv: KVNamespace): Promise<{
+  saved: boolean;
+  totalRecords: number;
+  generatedAt: string;
+}> {
+  const KEY = "kis:symbol-index:v1";
+  const TTL = 8 * 24 * 60 * 60; // 8일 (cron 1일 + 안전 마진 7일)
+  // 정적 indexJson을 그대로 직렬화하여 KV에 저장.
+  // 280KB라 KV 25MB value 한도 내 충분.
+  await kv.put(KEY, JSON.stringify(data), { expirationTtl: TTL });
+  return {
+    saved: true,
+    totalRecords: data.totalRecords,
+    generatedAt: data.generatedAt,
+  };
+}
+
+/**
+ * KV에서 인덱스 로드 (선택적 사용 — 향후 KV-aware lookup 기반).
+ * 현재는 sync API(findByCode/findByName/listByFilter)가 정적 인덱스만 사용.
+ * KV에서 가져온 인덱스를 사용하려면 추후 lazy-init 패턴으로 전환.
+ */
+export async function loadSymbolIndexFromKv(kv: KVNamespace): Promise<IndexFile | null> {
+  const KEY = "kis:symbol-index:v1";
+  const raw = await kv.get(KEY, "json");
+  return (raw as IndexFile | null) ?? null;
+}
+
 /** 분류 + 시장 필터로 전체 풀 반환 (advanced_search ETF 모드용 등). */
 export function listByFilter(options: FindByNameOptions = {}): SymbolRecord[] {
   const typeSet = options.types && options.types.length ? new Set(options.types) : null;
