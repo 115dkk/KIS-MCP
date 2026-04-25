@@ -17,9 +17,11 @@
 
 import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
-import type { KisRankingItem, KisResponse } from "../kis/types.js";
+import type { KisRankingItem } from "../kis/types.js";
+import { batchParallel } from "../utils/batch.js";
 import { isExcludedByKeyword } from "../utils/filters.js";
 import { parseNum } from "../utils/downsample.js";
+import { extractArray } from "../utils/kisResponse.js";
 import { isValidSymbol } from "../utils/symbol.js";
 import {
   listByFilter,
@@ -41,6 +43,8 @@ export interface AdvancedSearchInput {
   minMcap?: number; // 시총 하한 (한투 hts_avls 단위, 통상 억원)
   maxPer?: number;
   excludeOverseas?: boolean;
+  /** 채권/TDF/머니마켓 ETF 추가 제외 (M0-8). 주식 스크리닝에서 권장. */
+  excludeBonds?: boolean;
   /** When true, compute period return for top candidates (slower). */
   enrichWithReturn?: boolean;
   /**
@@ -148,6 +152,7 @@ export async function advancedSearch(
       isExcludedByKeyword(name, {
         extraKeywords: input.excludeKeywords,
         excludeOverseas: input.excludeOverseas,
+        excludeBonds: input.excludeBonds,
       })
     ) {
       return false;
@@ -189,28 +194,24 @@ export async function advancedSearch(
   // Optional return enrichment for return_* rankings.
   const period = RANK_RETURN_TO_PERIOD[input.rankBy];
   if (input.enrichWithReturn && period) {
-    const enriched: AdvancedSearchHit[] = [];
-    for (const hit of trimmed) {
-      try {
-        const ret = await getReturn(client, { symbol: hit.symbol, period });
-        enriched.push({
-          ...hit,
-          enrichedReturnPct: ret.absoluteReturnPct,
-          enrichedReturnPeriod: period,
-        });
-      } catch {
-        enriched.push(hit);
-      }
-    }
+    // batchParallel: 5건씩 병렬 호출 (레이트리미터 15/s 안전 마진).
+    const batchResults = await batchParallel(
+      trimmed,
+      (hit) => getReturn(client, { symbol: hit.symbol, period }),
+      5,
+    );
+    const enriched: AdvancedSearchHit[] = batchResults.map(({ item, result }) =>
+      result
+        ? { ...item, enrichedReturnPct: result.absoluteReturnPct, enrichedReturnPeriod: period }
+        : item,
+    );
     trimmed = enriched;
-    if (period) {
-      trimmed.sort((a, b) => {
-        const av = a.enrichedReturnPct ?? a.changeRate;
-        const bv = b.enrichedReturnPct ?? b.changeRate;
-        return order === "asc" ? av - bv : bv - av;
-      });
-    }
-    notes.push(`상위 ${trimmed.length}개에 대해 ${period} 수익률을 추가 계산`);
+    trimmed.sort((a, b) => {
+      const av = a.enrichedReturnPct ?? a.changeRate;
+      const bv = b.enrichedReturnPct ?? b.changeRate;
+      return order === "asc" ? av - bv : bv - av;
+    });
+    notes.push(`상위 ${trimmed.length}개에 대해 ${period} 수익률을 병렬 계산 (batch=5)`);
   }
 
   return {
@@ -293,13 +294,6 @@ async function fetchVolumeRanking(client: KisClient): Promise<KisRankingItem[]> 
   return extractArray<KisRankingItem>(res);
 }
 
-function extractArray<T>(res: KisResponse<unknown>): T[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as T[];
-  }
-  return [];
-}
-
 /**
  * 마스터파일(KOSPI+KOSDAQ ~4300 종목) 기반 풀 검색.
  *
@@ -353,6 +347,7 @@ async function advancedSearchViaMaster(
       isExcludedByKeyword(name, {
         extraKeywords: input.excludeKeywords,
         excludeOverseas: input.excludeOverseas,
+        excludeBonds: input.excludeBonds,
       })
     ) {
       return false;
@@ -384,20 +379,21 @@ async function advancedSearchViaMaster(
           `더 좁은 후보가 필요하면 sectorKeywords로 필터링하세요.`,
       );
     }
-    const enriched: AdvancedSearchHit[] = [];
-    for (const hit of targets) {
-      try {
-        const ret = await getReturn(client, { symbol: hit.symbol, period });
-        enriched.push({
-          ...hit,
-          price: ret.endPrice ?? NaN,
-          enrichedReturnPct: ret.absoluteReturnPct,
-          enrichedReturnPeriod: period,
-        });
-      } catch {
-        enriched.push(hit);
-      }
-    }
+    const batchResults = await batchParallel(
+      targets,
+      (hit) => getReturn(client, { symbol: hit.symbol, period }),
+      5,
+    );
+    const enriched: AdvancedSearchHit[] = batchResults.map(({ item, result }) =>
+      result
+        ? {
+            ...item,
+            price: result.endPrice ?? NaN,
+            enrichedReturnPct: result.absoluteReturnPct,
+            enrichedReturnPeriod: period,
+          }
+        : item,
+    );
     enriched.sort((a, b) => {
       const av = a.enrichedReturnPct;
       const bv = b.enrichedReturnPct;

@@ -15,15 +15,14 @@ import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
 import type {
   KisOverseasChartItem,
-  KisOverseasChartMeta,
   KisOverseasFuturesChartItem,
   KisOverseasFuturesMinuteItem,
   KisOverseasFuturesMinuteMeta,
   KisOverseasFuturesPriceOutput,
-  KisResponse,
 } from "../kis/types.js";
 import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
+import { extractArray, extractArrayPreferred, extractObject } from "../utils/kisResponse.js";
 import {
   nearestFutureContract,
   resolveAlias,
@@ -197,7 +196,7 @@ async function fetchFuturesCurrent(
     trId: KIS.overseasFuturesPrice.trIdReal,
     query: { srs_cd: resolvedCode },
   });
-  const o: Partial<KisOverseasFuturesPriceOutput> = res.output1 ?? res.output ?? {};
+  const o: Partial<KisOverseasFuturesPriceOutput> = extractObject<KisOverseasFuturesPriceOutput>(res);
   const decimals = alias.priceDecimals ?? 0;
   const scale = 10 ** decimals;
   const adj = (raw: string | undefined) => {
@@ -264,7 +263,7 @@ async function fetchSpotCurrent(
   const start = new Date(today);
   start.setUTCDate(start.getUTCDate() - 14); // 금시장은 휴장일 많음 → 2주 윈도우
 
-  const res = await client.get<KisOverseasChartItem[] | KisOverseasChartMeta>({
+  const res = await client.get<KisOverseasChartItem[]>({
     path: KIS.overseasChartPrice.path,
     trId: KIS.overseasChartPrice.trIdReal,
     query: {
@@ -276,7 +275,7 @@ async function fetchSpotCurrent(
     },
   });
 
-  const items = extractOverseasChartItems(res);
+  const items = extractArray<KisOverseasChartItem>(res);
   const points = items
     .map(itemToOverseasPoint)
     .filter((p): p is ChartPoint => p !== null)
@@ -364,7 +363,7 @@ export async function getCommodityChart(
         index_key: "",
       },
     });
-    const items = extractFuturesChartItems(res);
+    const items = extractArray<KisOverseasFuturesChartItem>(res);
     const decimals = alias.priceDecimals ?? 0;
     const points = items
       .map((it) => itemToFuturesPoint(it, decimals))
@@ -405,7 +404,7 @@ export async function getCommodityChart(
       fid_period_div_code: periodCode(period),
     },
   });
-  const items = extractOverseasChartItems(res);
+  const items = extractArray<KisOverseasChartItem>(res);
   const points = items
     .map(itemToOverseasPoint)
     .filter((p): p is ChartPoint => p !== null)
@@ -460,24 +459,6 @@ function periodCode(period: CommodityPeriod): string {
     case "minute":
       throw new Error("minute period는 별도 endpoint를 사용합니다 (이 함수 호출 금지)");
   }
-}
-
-function extractOverseasChartItems(
-  res: KisResponse<KisOverseasChartItem[] | KisOverseasChartMeta>,
-): KisOverseasChartItem[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisOverseasChartItem[];
-  }
-  return [];
-}
-
-function extractFuturesChartItems(
-  res: KisResponse<KisOverseasFuturesChartItem[]>,
-): KisOverseasFuturesChartItem[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisOverseasFuturesChartItem[];
-  }
-  return [];
 }
 
 function itemToOverseasPoint(item: KisOverseasChartItem): ChartPoint | null {
@@ -536,7 +517,11 @@ async function fetchFuturesMinuteChart(
       },
     });
 
-    const items = extractFuturesMinuteItems(res);
+    const items = extractArrayPreferred<KisOverseasFuturesMinuteItem>(res, [
+      "output1",
+      "output",
+      "output2",
+    ]);
     if (items.length === 0) break;
     let added = 0;
     for (const it of items) {
@@ -549,7 +534,7 @@ async function fetchFuturesMinuteChart(
     }
 
     // 페이지네이션 키 추출 — output2가 메타 (일봉과 반대)
-    const meta = ((res.output2 as unknown) as Partial<KisOverseasFuturesMinuteMeta>) ?? {};
+    const meta = extractObject<KisOverseasFuturesMinuteMeta>(res);
     const nextKey = meta.index_key?.trim();
     if (!nextKey || nextKey === indexKey || added === 0 || items.length < 120) break;
     qryTp = "P";
@@ -587,16 +572,6 @@ async function fetchFuturesMinuteChart(
       ...notes,
     ].filter((s): s is string => typeof s === "string" && s.length > 0),
   };
-}
-
-function extractFuturesMinuteItems(
-  res: KisResponse<KisOverseasFuturesMinuteItem[]>,
-): KisOverseasFuturesMinuteItem[] {
-  // 분봉은 output1=배열 (일봉과 반대)
-  for (const c of [res.output1, res.output, res.output2]) {
-    if (Array.isArray(c)) return c as KisOverseasFuturesMinuteItem[];
-  }
-  return [];
 }
 
 function itemToFuturesMinutePoint(

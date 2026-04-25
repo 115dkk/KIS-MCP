@@ -228,8 +228,10 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
     "get_etf_components",
     [
       "ETF의 구성종목 리스트와 비중(상위 N개 + 합계).",
+      "구성종목, 포트폴리오, 보유 종목, 비중 등의 질문에 사용.",
       "ETF 위험 분석을 위해 inspect_etf prompt 또는 get_credit_ratio와 함께 자주 사용됨.",
-      "파생/합성형 ETF는 빈 응답이 가능 (notes 필드로 안내).",
+      "KIS API의 비결정적 빈 응답 특성상 최대 5회 재시도(지수 백오프)하며, 그래도 빈 응답이면 message 필드로 시도 로그와 함께 안내.",
+      "파생/합성형 ETF는 진짜로 구성종목 정보가 없을 수 있음 (etf_cnfg_issu_cnt=0).",
     ].join(" "),
     {
       symbol: SYMBOL_SCHEMA.describe("ETF 종목코드 (예: 069500)"),
@@ -585,8 +587,10 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       "기본은 KIS 랭킹(시총/거래량/등락률 30건 cap) 후보군에서 키워드 필터링.",
       "useMasterPool=true (또는 instrumentType='etf'면 자동) → KOSPI+KOSDAQ 마스터파일(~4300종목)에서 검색 → 시총 30위 밖 종목·ETF도 발굴 가능.",
       "**인버스/레버리지/커버드콜/혼합형/선물형은 항상 자동 제외**.",
+      "excludeOverseas=true → 해외추종 ETF ~50개 키워드 추가 제외 (KODEX MSCI Korea는 화이트리스트로 생존).",
+      "excludeBonds=true → 채권/TDF/머니마켓 ETF 추가 제외 (주식 스크리닝 권장).",
       "rankBy=mcap만 시총 포함 (volume/fluctuation 랭킹과 마스터 풀에서는 minMcap 필터 무력).",
-      "enrichWithReturn=true는 후보별 실제 수익률 계산(마스터 풀에서는 30건 cap 적용, 워커 30s 보호).",
+      "enrichWithReturn=true는 후보별 실제 수익률 병렬 계산(batch=5, 마스터 풀에서는 30건 cap, 워커 30s 보호).",
     ].join(" "),
     {
       instrumentType: z
@@ -615,7 +619,15 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       excludeOverseas: z
         .boolean()
         .optional()
-        .describe("true면 미국/나스닥/중국 등 해외추종 ETF 추가 제외"),
+        .describe(
+          "true면 해외추종 ETF 추가 제외 (미국/나스닥/MSCI/필라델피아/테슬라·엔비디아 등 ~50개 키워드, KODEX MSCI Korea 같은 국내 추종은 화이트리스트로 면제)",
+        ),
+      excludeBonds: z
+        .boolean()
+        .optional()
+        .describe(
+          "true면 채권/TDF/머니마켓 ETF 추가 제외 (채권/국고채/회사채/금리/TDF/머니마켓/CD금리/하이일드 등). 주식 스크리닝 시 권장",
+        ),
       enrichWithReturn: z
         .boolean()
         .optional()

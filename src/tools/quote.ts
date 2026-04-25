@@ -10,6 +10,7 @@ import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
 import type { KisEtfPriceOutput, KisStockPriceOutput } from "../kis/types.js";
 import { parseNum } from "../utils/downsample.js";
+import { findByCode } from "../utils/symbolIndex.js";
 import { normalizeSymbol } from "../utils/symbol.js";
 
 export type InstrumentType = "stock" | "etf" | "auto";
@@ -88,7 +89,18 @@ export async function getQuote(client: KisClient, input: GetQuoteInput): Promise
     return fetchEtfQuote(client, symbol);
   }
 
-  // requested === "stock" or "auto":
+  // M0-5: auto 모드일 때 마스터 인덱스로 사전 감지하여 1회 호출로 단축.
+  // 마스터에 EF/EN/BC 분류로 등록된 종목이면 stock API 호출을 건너뛰고
+  // ETF API로 직행 (기존: stock API 호출 → 응답 검사 → ETF API 재호출, 2회).
+  if (requested === "auto") {
+    const rec = findByCode(symbol);
+    if (rec && (rec.type === "EF" || rec.type === "EN" || rec.type === "BC")) {
+      return fetchEtfQuote(client, symbol);
+    }
+    // 마스터에 없으면 신규 상장 가능성 → 기존 fallback 진행
+  }
+
+  // requested === "stock" or "auto" (마스터에 ST 또는 미존재):
   // inquire-price (FHKST01010100)는 ETF 종목코드에도 응답을 주지만 rprs_mrkt_kor_name이
   // "ETF"/"ETN"으로 구분된다. auto일 때는 응답 검사 후 필요시 etfPrice로 재호출.
   const stockRes = await client.get<KisStockPriceOutput>({

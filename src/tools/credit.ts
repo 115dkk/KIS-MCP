@@ -23,11 +23,12 @@ import type { KisClient } from "../kis/client.js";
 import type {
   KisCreditBalanceItem,
   KisLoanTransItem,
-  KisResponse,
   KisShortSaleItem,
   KisStockPriceOutput,
 } from "../kis/types.js";
+import { batchParallel } from "../utils/batch.js";
 import { parseNum } from "../utils/downsample.js";
+import { extractArray } from "../utils/kisResponse.js";
 import { getEtfComponents } from "./etf.js";
 import { isExcludedByKeyword } from "../utils/filters.js";
 import { isValidSymbol, normalizeSymbol } from "../utils/symbol.js";
@@ -186,19 +187,28 @@ export async function getCreditRatio(
     };
   }
 
+  // 사전 필터: 무효 심볼/키워드 제외
+  const candidates = components.components.filter(
+    (c) => isValidSymbol(c.symbol) && !isExcludedByKeyword(c.name),
+  );
+  let skipped = components.components.length - candidates.length;
+
+  // batchParallel: 5건씩 병렬 호출. credit/short/loan 각각 fetchStockMetrics 내부에서
+  // Promise.all로 묶이므로 1 batch = 최대 15 outbound (15/s 레이트 가까이).
+  // batch=3으로 보수적으로 잡아 3 × 4 = 12 동시 in-flight 유지.
+  const lookback = Math.min(lookbackDays, 14);
+  const batchResults = await batchParallel(
+    candidates,
+    (c) => fetchStockMetrics(client, c.symbol, lookback),
+    3,
+  );
   const componentMetrics: Array<CreditRatioStock & { weightPct: number }> = [];
-  let skipped = 0;
-  for (const c of components.components) {
-    if (!isValidSymbol(c.symbol) || isExcludedByKeyword(c.name)) {
+  for (const { item, result, error } of batchResults) {
+    if (error || !result) {
       skipped += 1;
       continue;
     }
-    try {
-      const m = await fetchStockMetrics(client, c.symbol, Math.min(lookbackDays, 14));
-      if (m) componentMetrics.push({ ...m, weightPct: c.weightPct });
-    } catch {
-      skipped += 1;
-    }
+    componentMetrics.push({ ...result, weightPct: item.weightPct });
   }
 
   const aggregate = aggregateEtf(componentMetrics);
@@ -410,14 +420,6 @@ function aggregateEtf(metrics: Array<CreditRatioStock & { weightPct: number }>):
     topByCreditBalanceRatio: topByCreditBalance,
     topByShortValueRatio: topByShort,
   };
-}
-
-function extractArray<T>(res: KisResponse<unknown> | undefined): T[] {
-  if (!res) return [];
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as T[];
-  }
-  return [];
 }
 
 function avg(nums: number[]): number | undefined {

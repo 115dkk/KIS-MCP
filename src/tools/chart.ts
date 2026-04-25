@@ -21,10 +21,10 @@ import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
 import type {
   KisChartItem,
-  KisResponse,
   KisStockMinuteChartItem,
 } from "../kis/types.js";
 import { downsample, parseNum } from "../utils/downsample.js";
+import { extractArray, extractArrayWithObjectFallback } from "../utils/kisResponse.js";
 import { normalizeSymbol } from "../utils/symbol.js";
 
 export type PeriodCode = "day" | "week" | "month" | "year" | "minute";
@@ -183,7 +183,7 @@ async function fetchDailyChart(
       },
     });
 
-    const items = extractDailyItems(res);
+    const items = extractArrayWithObjectFallback<KisChartItem>(res);
     if (items.length === 0) break;
 
     let newOldestYmd: string | null = null;
@@ -280,7 +280,7 @@ async function fetchMinuteChart(
       },
     });
 
-    const items = extractMinuteItems(res);
+    const items = extractArray<KisStockMinuteChartItem>(res);
     if (items.length === 0) break;
 
     let oldestKey: { ymd: string; hms: string } | null = null;
@@ -408,25 +408,6 @@ function stepBackOneMinute(ymd: string, hms: string): { ymd: string; hms: string
       newMm.toString().padStart(2, "0") +
       ss.toString().padStart(2, "0"),
   };
-}
-
-function extractDailyItems(res: KisResponse<KisChartItem[] | KisChartItem>): KisChartItem[] {
-  const candidates: unknown[] = [res.output, res.output1, res.output2];
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c as KisChartItem[];
-  }
-  if (res.output && typeof res.output === "object" && !Array.isArray(res.output)) {
-    return [res.output as KisChartItem];
-  }
-  return [];
-}
-
-function extractMinuteItems(res: KisResponse<KisStockMinuteChartItem[]>): KisStockMinuteChartItem[] {
-  const candidates: unknown[] = [res.output, res.output1, res.output2];
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c as KisStockMinuteChartItem[];
-  }
-  return [];
 }
 
 function dailyItemToPoint(item: KisChartItem): ChartPoint | null {

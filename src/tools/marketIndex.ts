@@ -17,10 +17,10 @@ import type {
   KisOverseasChartItem,
   KisOverseasChartMeta,
   KisOverseasIndexMinuteItem,
-  KisResponse,
 } from "../kis/types.js";
 import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
+import { extractArray, extractObject } from "../utils/kisResponse.js";
 import { resolveAlias, type MarketAlias } from "../utils/marketCodes.js";
 
 const VALID_INTERVALS: IntervalMinutes[] = [1, 3, 5, 10, 15, 30, 60];
@@ -198,7 +198,7 @@ async function fetchDomesticIndex(
       fid_input_iscd: alias.iscd!,
     },
   });
-  const o: Partial<KisIndexPriceOutput> = res.output ?? {};
+  const o: Partial<KisIndexPriceOutput> = extractObject<KisIndexPriceOutput>(res);
   return {
     input: inputSymbol,
     name: alias.displayName,
@@ -243,7 +243,7 @@ async function fetchOverseasIndex(
     },
   });
 
-  const items = extractOverseasChartItems(res);
+  const items = extractArray<KisOverseasChartItem>(res);
   // 가장 최근 영업일을 마지막 항목으로 정렬
   const sorted = items
     .map(itemToOverseasPoint)
@@ -251,7 +251,7 @@ async function fetchOverseasIndex(
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (sorted.length === 0) {
-    const meta: Partial<KisOverseasChartMeta> = (res.output1 as Partial<KisOverseasChartMeta>) ?? {};
+    const meta = extractObject<KisOverseasChartMeta>(res);
     // output1만이라도 있으면 그걸로
     if (meta.ovrs_nmix_prpr) {
       return {
@@ -330,7 +330,7 @@ export async function getIndexChart(
         fid_period_div_code: domesticPeriodCode(period),
       },
     });
-    const items = extractDomesticChartItems(res);
+    const items = extractArray<KisIndexDailyChartItem>(res);
     const points = items
       .map(itemToDomesticPoint)
       .filter((p): p is ChartPoint => p !== null)
@@ -366,7 +366,7 @@ export async function getIndexChart(
       fid_period_div_code: overseasPeriodCode(period),
     },
   });
-  const items = extractOverseasChartItems(res);
+  const items = extractArray<KisOverseasChartItem>(res);
   const points = items
     .map(itemToOverseasPoint)
     .filter((p): p is ChartPoint => p !== null)
@@ -448,7 +448,7 @@ async function fetchDomesticIndexMinute(
       fid_input_hour_1: "60", // 1분(60초)으로 받아 클라이언트 집계
     },
   });
-  const items = extractGenericArray<KisIndexMinuteItem>(res);
+  const items = extractArray<KisIndexMinuteItem>(res);
   const today = new Date().toISOString().slice(0, 10);
   const oneMin = items
     .map((it) => domesticIndexMinuteToPoint(it, today))
@@ -499,7 +499,7 @@ async function fetchOverseasIndexMinute(
       fid_pw_data_incu_yn: "Y",
     },
   });
-  const items = extractGenericArray<KisOverseasIndexMinuteItem>(res);
+  const items = extractArray<KisOverseasIndexMinuteItem>(res);
   const oneMin = items
     .map(overseasIndexMinuteToPoint)
     .filter((p): p is ChartPoint => p !== null)
@@ -557,32 +557,7 @@ function overseasIndexMinuteToPoint(item: KisOverseasIndexMinuteItem): ChartPoin
   };
 }
 
-function extractGenericArray<T>(res: KisResponse<T[]>): T[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as T[];
-  }
-  return [];
-}
-
 // ─────────────────────── 응답 파서 ───────────────────────
-
-function extractDomesticChartItems(
-  res: KisResponse<KisIndexDailyChartItem[]>,
-): KisIndexDailyChartItem[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisIndexDailyChartItem[];
-  }
-  return [];
-}
-
-function extractOverseasChartItems(
-  res: KisResponse<KisOverseasChartItem[] | KisOverseasChartMeta>,
-): KisOverseasChartItem[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisOverseasChartItem[];
-  }
-  return [];
-}
 
 function itemToDomesticPoint(item: KisIndexDailyChartItem): ChartPoint | null {
   if (!item.stck_bsop_date) return null;

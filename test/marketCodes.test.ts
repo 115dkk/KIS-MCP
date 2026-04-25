@@ -110,6 +110,70 @@ describe("resolveAlias — 원자재", () => {
   });
 });
 
+describe("resolveAlias — M3 신규 환율 (GBP/AUD/CAD)", () => {
+  it("GBPKRW / 파운드 / 영파운드 모두 동일 alias 객체 참조", () => {
+    const a1 = resolveAlias("GBPKRW");
+    const a2 = resolveAlias("파운드");
+    const a3 = resolveAlias("영파운드");
+    expect(a1?.iscd).toBe("FX@GBP");
+    expect(a1?.category).toBe("fx");
+    // M0-4 참조 공유 검증
+    expect(a1).toBe(a2);
+    expect(a1).toBe(a3);
+  });
+  it("AUDKRW / 호주달러", () => {
+    expect(resolveAlias("AUDKRW")?.iscd).toBe("FX@AUD");
+    expect(resolveAlias("호주달러")?.iscd).toBe("FX@AUD");
+  });
+  it("CADKRW / 캐나다달러", () => {
+    expect(resolveAlias("CADKRW")?.iscd).toBe("FX@CAD");
+    expect(resolveAlias("캐나다달러")?.iscd).toBe("FX@CAD");
+  });
+});
+
+describe("resolveAlias — M3 신규 원자재", () => {
+  it("SILVER / 은 / SI", () => {
+    const a = resolveAlias("SILVER");
+    expect(a?.srsBase).toBe("SI");
+    expect(a?.contractCadence).toBe("monthly");
+    expect(resolveAlias("은")).toBe(a);
+    expect(resolveAlias("SI")).toBe(a);
+  });
+  it("COPPER / 구리 / HG", () => {
+    expect(resolveAlias("COPPER")?.srsBase).toBe("HG");
+    expect(resolveAlias("구리")?.srsBase).toBe("HG");
+  });
+  it("NATGAS / 천연가스 / NG", () => {
+    expect(resolveAlias("NATGAS")?.srsBase).toBe("NG");
+    expect(resolveAlias("천연가스")?.srsBase).toBe("NG");
+  });
+  it("PALLADIUM / 팔라듐 — 분기 만기", () => {
+    const a = resolveAlias("팔라듐");
+    expect(a?.srsBase).toBe("PA");
+    expect(a?.contractCadence).toBe("quarterly");
+  });
+  it("PLATINUM / 백금 — 분기 만기", () => {
+    const a = resolveAlias("백금");
+    expect(a?.srsBase).toBe("PL");
+    expect(a?.contractCadence).toBe("quarterly");
+  });
+});
+
+describe("M0-4: 참조 공유 (resolveAlias 동일성)", () => {
+  it("KOSPI === 코스피 === KS11 (객체 동일성)", () => {
+    expect(resolveAlias("KOSPI")).toBe(resolveAlias("코스피"));
+    expect(resolveAlias("KOSPI")).toBe(resolveAlias("KS11"));
+  });
+  it("WTI === WTI원유 === CL", () => {
+    expect(resolveAlias("WTI")).toBe(resolveAlias("WTI원유"));
+    expect(resolveAlias("WTI")).toBe(resolveAlias("CL"));
+  });
+  it("USDKRW === 원달러 === 달러", () => {
+    expect(resolveAlias("USDKRW")).toBe(resolveAlias("원달러"));
+    expect(resolveAlias("USDKRW")).toBe(resolveAlias("달러"));
+  });
+});
+
 describe("resolveAlias — 매칭 실패", () => {
   it("미등록 alias는 null", () => {
     expect(resolveAlias("UNKNOWN")).toBeNull();

@@ -14,10 +14,10 @@ import type { KisClient } from "../kis/client.js";
 import type {
   KisOverseasChartItem,
   KisOverseasChartMeta,
-  KisResponse,
 } from "../kis/types.js";
 import type { ChartPoint } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
+import { extractArray, extractObject } from "../utils/kisResponse.js";
 import { resolveAlias, type MarketAlias } from "../utils/marketCodes.js";
 
 export interface GetFxInput {
@@ -148,14 +148,14 @@ export async function getFx(client: KisClient, input: GetFxInput): Promise<FxRes
     },
   });
 
-  const items = extractChartItems(res);
+  const items = extractArray<KisOverseasChartItem>(res);
   const points = items
     .map(itemToPoint)
     .filter((p): p is ChartPoint => p !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (points.length === 0) {
-    const meta: Partial<KisOverseasChartMeta> = (res.output1 as Partial<KisOverseasChartMeta>) ?? {};
+    const meta = extractObject<KisOverseasChartMeta>(res);
     if (meta.ovrs_nmix_prpr) {
       const r = parseNum(meta.ovrs_nmix_prpr);
       const c = numOrUndef(parseNum(meta.ovrs_nmix_prdy_vrss));
@@ -223,7 +223,7 @@ export async function getFxChart(
     },
   });
 
-  const items = extractChartItems(res);
+  const items = extractArray<KisOverseasChartItem>(res);
   const points = items
     .map(itemToPoint)
     .filter((p): p is ChartPoint => p !== null)
@@ -259,15 +259,6 @@ function periodCode(period: FxPeriod): string {
     case "5Y":
       return "M";
   }
-}
-
-function extractChartItems(
-  res: KisResponse<KisOverseasChartItem[] | KisOverseasChartMeta>,
-): KisOverseasChartItem[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisOverseasChartItem[];
-  }
-  return [];
 }
 
 function itemToPoint(item: KisOverseasChartItem): ChartPoint | null {

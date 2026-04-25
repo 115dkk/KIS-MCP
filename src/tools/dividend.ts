@@ -11,8 +11,9 @@
 
 import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
-import type { KisDividendItem, KisResponse, KisStockPriceOutput } from "../kis/types.js";
+import type { KisDividendItem, KisStockPriceOutput } from "../kis/types.js";
 import { parseNum } from "../utils/downsample.js";
+import { extractArrayWithObjectFallback } from "../utils/kisResponse.js";
 import { normalizeSymbol } from "../utils/symbol.js";
 
 export interface GetDividendInput {
@@ -100,7 +101,7 @@ export async function getDividend(
       .catch(() => null),
   ]);
 
-  const items = extractItems(divRes ?? undefined);
+  const items = extractArrayWithObjectFallback<KisDividendItem>(divRes);
   const records: DividendRecord[] = items
     .map(toRecord)
     .filter((r): r is DividendRecord => r !== null)
@@ -129,17 +130,6 @@ export async function getDividend(
     records,
     notes,
   };
-}
-
-function extractItems(res: KisResponse<KisDividendItem[] | KisDividendItem> | undefined): KisDividendItem[] {
-  if (!res) return [];
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisDividendItem[];
-  }
-  if (res.output1 && typeof res.output1 === "object" && !Array.isArray(res.output1)) {
-    return [res.output1 as KisDividendItem];
-  }
-  return [];
 }
 
 function toRecord(item: KisDividendItem): DividendRecord | null {

@@ -13,6 +13,7 @@ import { KIS } from "../kis/endpoints.js";
 import type { KisClient } from "../kis/client.js";
 import type { KisEtfComponentItem, KisResponse } from "../kis/types.js";
 import { parseNum } from "../utils/downsample.js";
+import { extractArray } from "../utils/kisResponse.js";
 import { normalizeSymbol } from "../utils/symbol.js";
 
 export interface GetEtfComponentsInput {
@@ -66,7 +67,21 @@ interface KisEtfComponentMeta {
   [key: string]: string | undefined;
 }
 
+// M0-9: 재시도 정책 강화. KIS API의 비결정적 빈 응답(30~50% 확률)에 대해
+// 5회까지 시도 + 지수 백오프(500ms × 1.5^i = 500/750/1125/1687).
+//   3회 실패 확률: 50%^3 = 12.5%
+//   5회 실패 확률: 50%^5 = 3.1%
+// 더 이상 재시도해도 빈 응답이면 진짜 데이터 없음 가능성 높음.
 const RETRY_DELAY_MS = 500;
+const RETRY_BACKOFF = 1.5;
+
+interface AttemptLog {
+  attempt: number;
+  emptyOutput: boolean;
+  emptyOutput1: boolean;
+  emptyOutput2: boolean;
+  expectedComponentCount: number;
+}
 
 export async function getEtfComponents(
   client: KisClient,
@@ -74,12 +89,14 @@ export async function getEtfComponents(
 ): Promise<EtfComponentsResult> {
   const symbol = normalizeSymbol(input.symbol);
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
-  const maxAttempts = Math.min(Math.max(input.maxAttempts ?? 3, 1), 5);
+  // M0-9: 기본 maxAttempts 3 → 5
+  const maxAttempts = Math.min(Math.max(input.maxAttempts ?? 5, 1), 5);
 
   let lastMeta: EtfMeta | undefined;
   let lastItems: KisEtfComponentItem[] = [];
   let attempts = 0;
   let isDerivative = false;
+  const attemptLog: AttemptLog[] = [];
 
   for (let i = 0; i < maxAttempts; i++) {
     attempts++;
@@ -94,8 +111,17 @@ export async function getEtfComponents(
       },
     });
 
-    lastMeta = extractMeta(res);
-    lastItems = extractItems(res);
+    lastMeta = parseEtfMeta(res);
+    lastItems = extractArray<KisEtfComponentItem>(res);
+
+    // 디버깅 보강 (M0-9): 시도별로 어느 output 필드에 데이터가 있었는지 기록.
+    attemptLog.push({
+      attempt: attempts,
+      emptyOutput: !Array.isArray(res.output) || res.output.length === 0,
+      emptyOutput1: !Array.isArray(res.output1) || (res.output1 as unknown[]).length === 0,
+      emptyOutput2: !Array.isArray(res.output2) || (res.output2 as unknown[]).length === 0,
+      expectedComponentCount: lastMeta?.expectedComponentCount ?? -1,
+    });
 
     if (lastItems.length > 0) break;
 
@@ -105,8 +131,11 @@ export async function getEtfComponents(
       break;
     }
 
-    // 마지막 시도가 아니면 잠시 대기 후 재시도
-    if (i < maxAttempts - 1) await sleep(RETRY_DELAY_MS);
+    // 마지막 시도가 아니면 지수 백오프 후 재시도 (M0-9: 고정 → 지수)
+    if (i < maxAttempts - 1) {
+      const delay = Math.round(RETRY_DELAY_MS * RETRY_BACKOFF ** i);
+      await sleep(delay);
+    }
   }
 
   if (lastItems.length === 0) {
@@ -125,6 +154,13 @@ export async function getEtfComponents(
       };
     }
     const expected = lastMeta?.expectedComponentCount ?? 0;
+    // M0-9: attemptLog를 message에 부착하여 디버깅 가시성 확보.
+    const attemptSummary = attemptLog
+      .map(
+        (a) =>
+          `#${a.attempt}: out=${a.emptyOutput ? "∅" : "■"}/out1=${a.emptyOutput1 ? "∅" : "■"}/out2=${a.emptyOutput2 ? "∅" : "■"}`,
+      )
+      .join(", ");
     return {
       etfSymbol: symbol,
       totalCount: 0,
@@ -136,6 +172,7 @@ export async function getEtfComponents(
       attempts,
       message:
         `KIS API가 ${attempts}회 호출 모두에서 구성종목 데이터를 반환하지 않았습니다 (예상 ${expected}개). ` +
+        `시도 로그: [${attemptSummary}]. ` +
         "KIS inquire-component-stock-price 엔드포인트는 같은 요청에도 빈 응답을 비결정적으로 내려보내는 알려진 동작이 있습니다. 잠시 후 재시도하면 데이터가 올 가능성이 높습니다.",
     };
   }
@@ -157,14 +194,13 @@ export async function getEtfComponents(
   };
 }
 
-function extractItems(res: KisResponse<unknown>): KisEtfComponentItem[] {
-  for (const c of [res.output, res.output1, res.output2]) {
-    if (Array.isArray(c)) return c as KisEtfComponentItem[];
-  }
-  return [];
-}
-
-function extractMeta(res: KisResponse<unknown>): EtfMeta | undefined {
+/**
+ * KIS raw 응답 → EtfMeta domain 변환.
+ *
+ * extract* 명명을 피한 이유: M0-1 원칙상 일반 응답 추출은 utils/kisResponse.ts
+ * 사용. 여기는 ETF 도메인 특정 메타 (nav/netAssets 등) 가공이므로 parse* 명명.
+ */
+function parseEtfMeta(res: KisResponse<unknown>): EtfMeta | undefined {
   // output1은 ETF 메타 (객체). output2가 components (배열).
   const candidate =
     !Array.isArray(res.output1) && typeof res.output1 === "object" ? (res.output1 as KisEtfComponentMeta) : null;

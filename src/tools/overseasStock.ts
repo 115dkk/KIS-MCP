@@ -24,10 +24,10 @@ import type {
   KisOverseasStockDailyMeta,
   KisOverseasStockMinuteItem,
   KisOverseasStockMinuteMeta,
-  KisResponse,
 } from "../kis/types.js";
 import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
+import { extractArrayPreferred, extractObject } from "../utils/kisResponse.js";
 
 export type OverseasMarket =
   | "NAS"
@@ -212,10 +212,14 @@ async function fetchDailyChart(
         KEYB: keyb,
       },
     });
-    const meta = ((res.output1 as unknown) as Partial<KisOverseasStockDailyMeta>) ?? {};
+    const meta = extractObject<KisOverseasStockDailyMeta>(res);
     if (meta.zdiv !== undefined) priceDecimals = parseNum(meta.zdiv) || 0;
     if (meta.rsym) rsym = meta.rsym;
-    const items = extractDailyItems(res);
+    const items = extractArrayPreferred<KisOverseasStockDailyItem>(res, [
+      "output2",
+      "output",
+      "output1",
+    ]);
     if (items.length === 0) break;
 
     let oldestYmd: string | null = null;
@@ -304,10 +308,14 @@ async function fetchMinuteChart(
         KEYB: keyb,
       },
     });
-    const meta = ((res.output1 as unknown) as Partial<KisOverseasStockMinuteMeta>) ?? {};
+    const meta = extractObject<KisOverseasStockMinuteMeta>(res);
     if (meta.zdiv !== undefined) priceDecimals = parseNum(meta.zdiv) || 0;
     if (meta.rsym) rsym = meta.rsym;
-    const items = extractMinuteItems(res);
+    const items = extractArrayPreferred<KisOverseasStockMinuteItem>(res, [
+      "output2",
+      "output",
+      "output1",
+    ]);
     if (items.length === 0) break;
 
     let oldest: { ymd: string; hms: string } | null = null;
@@ -389,26 +397,6 @@ function stepBackOneMinute(ymd: string, hms: string): { ymd: string; hms: string
       newMm.toString().padStart(2, "0") +
       ss.toString().padStart(2, "0"),
   };
-}
-
-function extractDailyItems(
-  res: KisResponse<KisOverseasStockDailyItem[]>,
-): KisOverseasStockDailyItem[] {
-  // 일봉은 output2가 배열
-  for (const c of [res.output2, res.output, res.output1]) {
-    if (Array.isArray(c)) return c as KisOverseasStockDailyItem[];
-  }
-  return [];
-}
-
-function extractMinuteItems(
-  res: KisResponse<KisOverseasStockMinuteItem[]>,
-): KisOverseasStockMinuteItem[] {
-  // 분봉은 output2가 배열 (일봉과 동일)
-  for (const c of [res.output2, res.output, res.output1]) {
-    if (Array.isArray(c)) return c as KisOverseasStockMinuteItem[];
-  }
-  return [];
 }
 
 function dailyItemToPoint(item: KisOverseasStockDailyItem): ChartPoint | null {

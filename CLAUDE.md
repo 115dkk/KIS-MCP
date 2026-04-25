@@ -197,6 +197,16 @@ src/
 - 토큰, API 키, 계좌번호는 로그에 찍지 않는다.
 - 에러 발생 시 상세 로그는 Cloudflare Workers Observability로 전송.
 
+### 5.7. 코드 구조 원칙 (리팩토링 이후 신규 코드에 적용)
+
+ROADMAP M0 리팩토링 결과 확립된 원칙. 신규 도구 작성 시 반드시 준수.
+
+- **DRY:** KIS 응답 추출은 `src/utils/kisResponse.ts`의 `extractArray` / `extractArrayPreferred` / `extractArrayWithObjectFallback` / `extractObject` / `extractObjectPreferred`를 사용한다. 도구 파일 내부에 개별 extract 함수를 정의하지 않는다.
+- **빈 배열 건너뛰기:** `extractArray`는 `Array.isArray(c) && c.length > 0` 조건을 사용한다. KIS가 `output: []`, `output2: [실제 데이터]`를 보내는 경우(ETF 구성종목 등)에 빈 배열을 건너뛰고 실제 데이터에 도달해야 한다.
+- **병렬화:** 독립적인 API 호출을 순차 `for...of + await` 루프로 처리하지 않는다. `src/utils/batch.ts`의 `batchParallel`을 사용한다. batchSize는 레이트 리미터 용량(15) 미만으로 설정 — 일반적으로 5 권장, 내부에서 다중 outbound가 묶이는 경우 3.
+- **사전 계산:** 반복 사용되는 연산(예: `normalizeName` 4300회/호출)은 모듈 로드 시점에 사전 계산하여 캐싱한다. 호출 시점에 재계산하지 않는다.
+- **참조 공유:** 동일 데이터를 여러 키에 매핑할 때, 객체 리터럴을 복사하지 않고 상수 참조를 공유한다. `src/utils/marketCodes.ts`의 alias 테이블이 표준 패턴 — 각 고유 대상은 `_KOSPI` 같은 underscore prefix 상수로 한 번만 정의하고 ALIAS_TABLE에서 모든 alias가 그 상수를 참조한다.
+
 ---
 
 ## 6. 참고 자료
@@ -310,18 +320,9 @@ src/
 
 ## 11. 개발 우선순위
 
-Claude Code가 순차적으로 구현할 권장 순서:
+> **🚧 진행 중 작업 (임시):** [`ROADMAP.md`](./ROADMAP.md) — M0~M8 마일스톤 명세대로 개발 진행 중. 모든 마일스톤 완료 후 본 임시 링크는 제거한다.
 
-1. **기반:** 프로젝트 골격, `wrangler.toml`, KV 설정, 타입 정의
-2. **인증:** `kis/auth.ts` + 토큰 캐싱
-3. **클라이언트:** `kis/client.ts` 공통 REST 래퍼
-4. **MCP 서버:** `mcp/server.ts` + SSE transport
-5. **기본 도구 (4.1~4.3):** 시세, 수익률, 차트
-6. **ETF 도구 (4.4):** 구성종목
-7. **재무 (4.5):** PER/PBR 등
-8. **신용거래율 (4.6):** 복수 API 조합 로직
-9. **고급 검색 (4.7):** 메타 도구, 필터링 규칙
-10. **문서화 및 테스트**
+ROADMAP.md가 본 §11의 권장 순서를 대체한다. Claude Code는 ROADMAP.md의 마일스톤을 순서대로 실행하며, 각 마일스톤의 모든 항목이 완료되고 검증 체크리스트를 통과한 뒤 다음 마일스톤으로 진행한다.
 
 각 단계 완료 후 `wrangler dev`로 실제 동작 확인하며 진행한다.
 

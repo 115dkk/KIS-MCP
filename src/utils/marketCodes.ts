@@ -48,152 +48,193 @@ export interface MarketAlias {
   notes?: string;
 }
 
+// ─── 단일 진실의 원천: 카테고리별 대상 상수 (M0-4 참조 공유) ───
+// 각 고유 대상에 대해 객체를 단 1번만 생성하고, ALIAS_TABLE에서 모든 alias가
+// 이 상수를 참조한다. 결과: (1) 메모리 절감 (2) 변경 1군데만 (3) 참조 동일성
+// 보장 (resolveAlias("KOSPI") === resolveAlias("코스피")).
+//
+// underscore prefix는 외부 export와 시각적으로 구분.
+
+// 국내 지수 (FHPUP02100000 + MRKT=U)
+const _KOSPI: MarketAlias = { category: "index-domestic", mrkt: "U", iscd: "0001", displayName: "코스피" };
+const _KOSDAQ: MarketAlias = { category: "index-domestic", mrkt: "U", iscd: "1001", displayName: "코스닥" };
+const _KOSPI200: MarketAlias = { category: "index-domestic", mrkt: "U", iscd: "2001", displayName: "코스피200" };
+const _KOSDAQ150: MarketAlias = { category: "index-domestic", mrkt: "U", iscd: "3003", displayName: "KOSDAQ150" };
+
+// 해외 지수 (FHKST03030100 + MRKT=N)
+const _SPX: MarketAlias = { category: "index-overseas", mrkt: "N", iscd: "SPX", displayName: "S&P 500" };
+const _NASDAQ_COMP: MarketAlias = { category: "index-overseas", mrkt: "N", iscd: "COMP", displayName: "NASDAQ Composite" };
+const _NASDAQ_100: MarketAlias = { category: "index-overseas", mrkt: "N", iscd: "NDX", displayName: "NASDAQ-100" };
+const _DJI: MarketAlias = { category: "index-overseas", mrkt: "N", iscd: ".DJI", displayName: "Dow Jones Industrial" };
+
+// 환율 (FHKST03030100 + MRKT=X)
+const _USD_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@KRW", displayName: "USD/KRW", unit: "원" };
+const _EUR_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@EUR", displayName: "EUR/KRW", unit: "원" };
+const _JPY_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@JPY", displayName: "JPY/KRW (100엔)", unit: "원" };
+const _CNY_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@CNY", displayName: "CNY/KRW", unit: "원" };
+const _GBP_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@GBP", displayName: "GBP/KRW", unit: "원", notes: "ISCD 미검증 — 응답 비면 master fallback" };
+const _AUD_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@AUD", displayName: "AUD/KRW", unit: "원", notes: "ISCD 미검증 — 응답 비면 master fallback" };
+const _CAD_KRW: MarketAlias = { category: "fx", mrkt: "X", iscd: "FX@CAD", displayName: "CAD/KRW", unit: "원", notes: "ISCD 미검증 — 응답 비면 master fallback" };
+
+// 원자재 (해외선물 — HHDFC55010000)
+const _WTI: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "CL",
+  contractCadence: "monthly",
+  displayName: "WTI 원유 (NYMEX / 한투 CME 분류)",
+  unit: "USD/barrel",
+  priceDecimals: 2,
+};
+// Brent: 한투 ffcode.mst 마스터에는 base="BZ"로 등록되어 있으나, 실제 API
+// (HHDFC55010000)는 SRS_CD에 "BRN" prefix를 받는다 (한투 공식 spec 예시 BRNF25).
+// 마스터 ↔ API의 알려진 코드 불일치 케이스.
+const _BRENT: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "BRN",
+  contractCadence: "monthly",
+  displayName: "Brent 원유 (ICE)",
+  unit: "USD/barrel",
+  priceDecimals: 2,
+};
+// GC = COMEX Gold Futures. 분기 만기(H/M/U/Z)이지만 매월 거래 가능.
+const _GOLD: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "GC",
+  contractCadence: "monthly",
+  displayName: "COMEX 금 선물 (100oz, 한투 CME 분류)",
+  unit: "USD/oz",
+  priceDecimals: 1,
+  notes: "한투는 KRX 금현물 시세를 직접 제공하지 않음. COMEX 금선물(GC)로 우회.",
+};
+// 추가 원자재 (M3) — 한투 ffcode.mst 표 기준 추정값. priceDecimals/srsBase는
+// 실호출 검증 후 보정 가능하도록 notes에 명시.
+const _SILVER: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "SI",
+  contractCadence: "monthly",
+  displayName: "COMEX 은 선물",
+  unit: "USD/oz",
+  priceDecimals: 3,
+  notes: "ffcode.mst 미검증 — 응답이 비면 raw SRS_CD(SIK26 등) 직접 입력",
+};
+const _COPPER: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "HG",
+  contractCadence: "monthly",
+  displayName: "COMEX 구리 선물",
+  unit: "USD/lb",
+  priceDecimals: 4,
+  notes: "ffcode.mst 미검증 — 응답이 비면 raw SRS_CD(HGK26 등) 직접 입력",
+};
+const _NATGAS: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "NG",
+  contractCadence: "monthly",
+  displayName: "NYMEX 천연가스 선물",
+  unit: "USD/MMBtu",
+  priceDecimals: 3,
+  notes: "ffcode.mst 미검증 — 응답이 비면 raw SRS_CD(NGK26 등) 직접 입력",
+};
+const _PALLADIUM: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "PA",
+  contractCadence: "quarterly",
+  displayName: "NYMEX 팔라듐 선물",
+  unit: "USD/oz",
+  priceDecimals: 1,
+  notes: "ffcode.mst 미검증 — 분기 만기물(H/M/U/Z) 자동 산출",
+};
+const _PLATINUM: MarketAlias = {
+  category: "commodity-futures",
+  srsBase: "PL",
+  contractCadence: "quarterly",
+  displayName: "NYMEX 백금 선물",
+  unit: "USD/oz",
+  priceDecimals: 1,
+  notes: "ffcode.mst 미검증 — 분기 만기물(H/M/U/Z) 자동 산출",
+};
+
 /**
  * Alias 테이블. 키는 정규화된(uppercase, trim) 형태로 사전 매핑.
  * 한국어 alias도 그대로 받기 위해 정규화 시 case는 변환하되 한글은 보존.
+ *
+ * 모든 alias는 위의 상수를 참조 — 객체 리터럴 복사 없음 (M0-4).
  */
 const ALIAS_TABLE: Record<string, MarketAlias> = {
-  // ─── 국내 지수 (FHPUP02100000 + MRKT=U) ───
-  // 출처: 한투 엑셀 "국내업종 현재지수" 시트의 FID_INPUT_ISCD 명세
-  KOSPI: { category: "index-domestic", mrkt: "U", iscd: "0001", displayName: "코스피" },
-  코스피: { category: "index-domestic", mrkt: "U", iscd: "0001", displayName: "코스피" },
-  KS11: { category: "index-domestic", mrkt: "U", iscd: "0001", displayName: "코스피" },
+  // ─── 국내 지수 ───
+  KOSPI: _KOSPI,
+  코스피: _KOSPI,
+  KS11: _KOSPI,
+  KOSDAQ: _KOSDAQ,
+  코스닥: _KOSDAQ,
+  KQ11: _KOSDAQ,
+  KOSPI200: _KOSPI200,
+  코스피200: _KOSPI200,
+  KS200: _KOSPI200,
+  KSQ150: _KOSDAQ150,
+  KOSDAQ150: _KOSDAQ150,
 
-  KOSDAQ: { category: "index-domestic", mrkt: "U", iscd: "1001", displayName: "코스닥" },
-  코스닥: { category: "index-domestic", mrkt: "U", iscd: "1001", displayName: "코스닥" },
-  KQ11: { category: "index-domestic", mrkt: "U", iscd: "1001", displayName: "코스닥" },
+  // ─── 해외 지수 ───
+  SPX: _SPX,
+  "S&P500": _SPX,
+  SP500: _SPX,
+  COMP: _NASDAQ_COMP,
+  NASDAQ: _NASDAQ_COMP,
+  IXIC: _NASDAQ_COMP,
+  나스닥: _NASDAQ_COMP,
+  NDX: _NASDAQ_100,
+  "NASDAQ-100": _NASDAQ_100,
+  NASDAQ100: _NASDAQ_100,
+  DJI: _DJI,
+  DOW: _DJI,
+  DJIA: _DJI,
+  다우: _DJI,
 
-  KOSPI200: { category: "index-domestic", mrkt: "U", iscd: "2001", displayName: "코스피200" },
-  코스피200: { category: "index-domestic", mrkt: "U", iscd: "2001", displayName: "코스피200" },
-  KS200: { category: "index-domestic", mrkt: "U", iscd: "2001", displayName: "코스피200" },
+  // ─── 환율 ───
+  USDKRW: _USD_KRW,
+  원달러: _USD_KRW,
+  달러: _USD_KRW,
+  USDKRW_X: _USD_KRW,
+  EURKRW: _EUR_KRW,
+  유로: _EUR_KRW,
+  JPYKRW: _JPY_KRW,
+  엔화: _JPY_KRW,
+  CNYKRW: _CNY_KRW,
+  위안: _CNY_KRW,
+  GBPKRW: _GBP_KRW,
+  파운드: _GBP_KRW,
+  영파운드: _GBP_KRW,
+  AUDKRW: _AUD_KRW,
+  호주달러: _AUD_KRW,
+  CADKRW: _CAD_KRW,
+  캐나다달러: _CAD_KRW,
 
-  KSQ150: { category: "index-domestic", mrkt: "U", iscd: "3003", displayName: "KOSDAQ150" },
-  KOSDAQ150: { category: "index-domestic", mrkt: "U", iscd: "3003", displayName: "KOSDAQ150" },
-
-  // ─── 해외 지수 (FHKST03030100 + MRKT=N) ───
-  // ISCD는 한투 GitHub 마스터파일(해외 지수) 기준. 코드 변경 시 master fallback이 작동.
-  SPX: { category: "index-overseas", mrkt: "N", iscd: "SPX", displayName: "S&P 500" },
-  "S&P500": { category: "index-overseas", mrkt: "N", iscd: "SPX", displayName: "S&P 500" },
-  SP500: { category: "index-overseas", mrkt: "N", iscd: "SPX", displayName: "S&P 500" },
-
-  COMP: { category: "index-overseas", mrkt: "N", iscd: "COMP", displayName: "NASDAQ Composite" },
-  NASDAQ: { category: "index-overseas", mrkt: "N", iscd: "COMP", displayName: "NASDAQ Composite" },
-  IXIC: { category: "index-overseas", mrkt: "N", iscd: "COMP", displayName: "NASDAQ Composite" },
-  나스닥: { category: "index-overseas", mrkt: "N", iscd: "COMP", displayName: "NASDAQ Composite" },
-
-  NDX: { category: "index-overseas", mrkt: "N", iscd: "NDX", displayName: "NASDAQ-100" },
-  "NASDAQ-100": { category: "index-overseas", mrkt: "N", iscd: "NDX", displayName: "NASDAQ-100" },
-  NASDAQ100: { category: "index-overseas", mrkt: "N", iscd: "NDX", displayName: "NASDAQ-100" },
-
-  DJI: { category: "index-overseas", mrkt: "N", iscd: ".DJI", displayName: "Dow Jones Industrial" },
-  DOW: { category: "index-overseas", mrkt: "N", iscd: ".DJI", displayName: "Dow Jones Industrial" },
-  DJIA: { category: "index-overseas", mrkt: "N", iscd: ".DJI", displayName: "Dow Jones Industrial" },
-  다우: { category: "index-overseas", mrkt: "N", iscd: ".DJI", displayName: "Dow Jones Industrial" },
-
-  // ─── 환율 (FHKST03030100 + MRKT=X) ───
-  // 한투 ISCD는 마스터파일에 따라 변동. 1차 추정값 사용 후 실패 시 master fallback.
-  USDKRW: { category: "fx", mrkt: "X", iscd: "FX@KRW", displayName: "USD/KRW", unit: "원" },
-  원달러: { category: "fx", mrkt: "X", iscd: "FX@KRW", displayName: "USD/KRW", unit: "원" },
-  달러: { category: "fx", mrkt: "X", iscd: "FX@KRW", displayName: "USD/KRW", unit: "원" },
-  USDKRW_X: { category: "fx", mrkt: "X", iscd: "FX@KRW", displayName: "USD/KRW", unit: "원" },
-
-  EURKRW: { category: "fx", mrkt: "X", iscd: "FX@EUR", displayName: "EUR/KRW", unit: "원" },
-  유로: { category: "fx", mrkt: "X", iscd: "FX@EUR", displayName: "EUR/KRW", unit: "원" },
-  JPYKRW: { category: "fx", mrkt: "X", iscd: "FX@JPY", displayName: "JPY/KRW (100엔)", unit: "원" },
-  엔화: { category: "fx", mrkt: "X", iscd: "FX@JPY", displayName: "JPY/KRW (100엔)", unit: "원" },
-  CNYKRW: { category: "fx", mrkt: "X", iscd: "FX@CNY", displayName: "CNY/KRW", unit: "원" },
-  위안: { category: "fx", mrkt: "X", iscd: "FX@CNY", displayName: "CNY/KRW", unit: "원" },
-
-  // ─── 원자재 (해외선물 — HHDFC55010000) ───
-  // CL = NYMEX WTI Crude Oil (월간 만기). LCO = ICE Brent Crude Oil (월간 만기).
-  WTI: {
-    category: "commodity-futures",
-    srsBase: "CL",
-    contractCadence: "monthly",
-    displayName: "WTI 원유 (NYMEX / 한투 CME 분류)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-  WTI원유: {
-    category: "commodity-futures",
-    srsBase: "CL",
-    contractCadence: "monthly",
-    displayName: "WTI 원유 (NYMEX / 한투 CME 분류)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-  CL: {
-    category: "commodity-futures",
-    srsBase: "CL",
-    contractCadence: "monthly",
-    displayName: "WTI 원유 (NYMEX / 한투 CME 분류)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-  // Brent: 한투 ffcode.mst 마스터에는 base="BZ"로 등록되어 있으나, 실제 API
-  // (HHDFC55010000)는 SRS_CD에 "BRN" prefix를 받는다 (한투 공식 spec 예시 BRNF25).
-  // 마스터 ↔ API의 알려진 코드 불일치 케이스.
-  BRENT: {
-    category: "commodity-futures",
-    srsBase: "BRN",
-    contractCadence: "monthly",
-    displayName: "Brent 원유 (ICE)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-  브렌트유: {
-    category: "commodity-futures",
-    srsBase: "BRN",
-    contractCadence: "monthly",
-    displayName: "Brent 원유 (ICE)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-  브렌트: {
-    category: "commodity-futures",
-    srsBase: "BRN",
-    contractCadence: "monthly",
-    displayName: "Brent 원유 (ICE)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-  BRN: {
-    category: "commodity-futures",
-    srsBase: "BRN",
-    contractCadence: "monthly",
-    displayName: "Brent 원유 (ICE)",
-    unit: "USD/barrel",
-    priceDecimals: 2,
-  },
-
-  // ─── 금 (선물 우회 — overseas chart MRKT=S) ───
-  // GC = COMEX Gold Futures. 분기 만기(H/M/U/Z)이지만 매월 거래 가능.
-  GOLD: {
-    category: "commodity-futures",
-    srsBase: "GC",
-    contractCadence: "monthly",
-    displayName: "COMEX 금 선물 (100oz, 한투 CME 분류)",
-    unit: "USD/oz",
-    priceDecimals: 1,
-    notes: "한투는 KRX 금현물 시세를 직접 제공하지 않음. COMEX 금선물(GC)로 우회.",
-  },
-  금: {
-    category: "commodity-futures",
-    srsBase: "GC",
-    contractCadence: "monthly",
-    displayName: "COMEX 금 선물 (100oz, 한투 CME 분류)",
-    unit: "USD/oz",
-    priceDecimals: 1,
-    notes: "한투는 KRX 금현물 시세를 직접 제공하지 않음. COMEX 금선물(GC)로 우회.",
-  },
-  GC: {
-    category: "commodity-futures",
-    srsBase: "GC",
-    contractCadence: "monthly",
-    displayName: "COMEX 금 선물 (100oz)",
-    unit: "USD/oz",
-    priceDecimals: 1,
-  },
+  // ─── 원자재 (선물) ───
+  WTI: _WTI,
+  WTI원유: _WTI,
+  CL: _WTI,
+  BRENT: _BRENT,
+  브렌트유: _BRENT,
+  브렌트: _BRENT,
+  BRN: _BRENT,
+  GOLD: _GOLD,
+  금: _GOLD,
+  GC: _GOLD,
+  SILVER: _SILVER,
+  은: _SILVER,
+  SI: _SILVER,
+  COPPER: _COPPER,
+  구리: _COPPER,
+  HG: _COPPER,
+  NATGAS: _NATGAS,
+  천연가스: _NATGAS,
+  NG: _NATGAS,
+  PALLADIUM: _PALLADIUM,
+  팔라듐: _PALLADIUM,
+  PA: _PALLADIUM,
+  PLATINUM: _PLATINUM,
+  백금: _PLATINUM,
+  PL: _PLATINUM,
 };
 
 /** 한투 ffcode.mst의 월코드 (F=1월 … Z=12월). */
