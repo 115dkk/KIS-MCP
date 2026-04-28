@@ -642,7 +642,7 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       "excludeOverseas=true → 해외추종 ETF 70+개 키워드 추가 제외 (브로드컴/샤오미/BYD/팔란티어/World 등 + 미국/나스닥/MSCI; KODEX MSCI Korea는 Korea 화이트리스트로 생존).",
       "excludeBonds=true → **주식 아닌 자산** ETF 추가 제외 (채권/은행채/WGBI/TDF/머니마켓/리츠/부동산/인프라/원자재 등). 사용자가 '주식형 ETF' 요청 시 필수.",
       "rankBy=mcap만 시총 포함 (volume/fluctuation 랭킹과 마스터 풀에서는 minMcap 필터 무력).",
-      "enrichWithReturn=true는 후보별 실제 수익률 병렬 계산(batch=5, 마스터 풀에서는 30건 cap, 워커 30s 보호).",
+      "enrichWithReturn=true는 후보별 실제 수익률 병렬 계산(batch=5, 마스터 풀에서는 30건 cap, 워커 30s 보호). enrichmentPeriod로 1M~5Y 지정 가능 (mcap/volume 풀의 N기간 정렬).",
     ].join(" "),
     {
       instrumentType: z
@@ -693,6 +693,12 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
         .boolean()
         .optional()
         .describe("true면 후보 종목별 실제 기간 수익률 계산 후 재정렬 (느림). 마스터 풀에서는 상위 30건만 처리"),
+      enrichmentPeriod: z
+        .enum(["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD"])
+        .optional()
+        .describe(
+          "enrichWithReturn 적용 시 계산할 기간. rankBy=mcap/volume 같이 기간이 내재되지 않은 풀에서 명시 (예: 시총 상위 30개의 1Y 수익률 정렬). rankBy=return_*면 무시. 미지정 시 1Y.",
+        ),
       enrichWithFundamentals: z
         .boolean()
         .optional()

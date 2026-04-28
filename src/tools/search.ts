@@ -49,6 +49,13 @@ export interface AdvancedSearchInput {
   /** When true, compute period return for top candidates (slower). */
   enrichWithReturn?: boolean;
   /**
+   * enrichWithReturn=true일 때 계산할 기간을 명시적으로 지정.
+   * - rankBy=return_1y/6m/3m/1m이면 그 매핑이 우선 (이 옵션 무시).
+   * - rankBy=mcap/volume이면 이 옵션이 적용되어 "시총/거래량 풀 안에서의 N기간 수익률 정렬"이 가능.
+   *   미지정 시 기본 '1Y'.
+   */
+  enrichmentPeriod?: ReturnPeriod;
+  /**
    * 후보별 PER/PBR을 추가 조회하고 maxPer/maxPbr 필터를 적용 (M1).
    * 가치주 스크리닝(screen_value_stocks Prompt) 핵심 옵션.
    * 후보 상위 ENRICH_CAP(30)건에 대해 batchParallel(batch=5) 호출.
@@ -203,14 +210,21 @@ export async function advancedSearch(
     rankFromKis: parseNum(c.data_rank) || i + 1,
   }));
 
-  let trimmed = baseHits.slice(0, limit);
+  // Optional return enrichment.
+  // rankBy=return_*면 매핑 사용. mcap/volume이면 enrichmentPeriod (기본 1Y) 사용.
+  const period: ReturnPeriod | undefined =
+    RANK_RETURN_TO_PERIOD[input.rankBy] ??
+    (input.enrichWithReturn ? input.enrichmentPeriod ?? "1Y" : undefined);
 
-  // Optional return enrichment for return_* rankings.
-  const period = RANK_RETURN_TO_PERIOD[input.rankBy];
+  // **enrichment는 limit으로 자르기 전에 적용** — 그래야 30개 풀 전체의 N기간
+  // 수익률로 정렬한 결과의 상위/하위 limit을 얻을 수 있음.
+  // 자르고 나서 정렬하면 잘린 풀 안에서만 정렬되어 사용자 의도(전체 풀의 상위/하위)와 다름.
+  // 30s wall-clock 보호: 풀 전체(~30개) 모두 enrichment.
+  let trimmed: AdvancedSearchHit[];
   if (input.enrichWithReturn && period) {
     // batchParallel: 5건씩 병렬 호출 (레이트리미터 15/s 안전 마진).
     const batchResults = await batchParallel(
-      trimmed,
+      baseHits,
       (hit) => getReturn(client, { symbol: hit.symbol, period }),
       5,
     );
@@ -219,13 +233,18 @@ export async function advancedSearch(
         ? { ...item, enrichedReturnPct: result.absoluteReturnPct, enrichedReturnPeriod: period }
         : item,
     );
-    trimmed = enriched;
-    trimmed.sort((a, b) => {
+    enriched.sort((a, b) => {
       const av = a.enrichedReturnPct ?? a.changeRate;
       const bv = b.enrichedReturnPct ?? b.changeRate;
       return order === "asc" ? av - bv : bv - av;
     });
-    notes.push(`상위 ${trimmed.length}개에 대해 ${period} 수익률을 병렬 계산 (batch=5)`);
+    trimmed = enriched.slice(0, limit);
+    notes.push(
+      `풀 전체 ${baseHits.length}개에 ${period} 수익률 병렬 계산(batch=5) 후 ${order} 정렬, 상위 ${trimmed.length}개 반환` +
+        (RANK_RETURN_TO_PERIOD[input.rankBy] ? "" : ` (rankBy=${input.rankBy} 풀의 ${period} 진짜 순위)`),
+    );
+  } else {
+    trimmed = baseHits.slice(0, limit);
   }
 
   // M1: PER/PBR enrichment + maxPer/maxPbr 필터.
@@ -439,8 +458,11 @@ async function advancedSearchViaMaster(
     rankFromKis: i + 1,
   }));
 
-  // enrichment: rankBy=return_*에서 의미 있음. 마스터 풀이 크므로 호출 보호.
-  const period = RANK_RETURN_TO_PERIOD[input.rankBy];
+  // enrichment: rankBy=return_*면 매핑 사용. mcap/volume이면 enrichmentPeriod 사용.
+  // 마스터 풀이 크므로 호출 보호.
+  const period: ReturnPeriod | undefined =
+    RANK_RETURN_TO_PERIOD[input.rankBy] ??
+    (input.enrichWithReturn ? input.enrichmentPeriod ?? "1Y" : undefined);
   const ENRICH_CAP = 30; // rate-limit + 30s wall-clock 안전 마진
   if (input.enrichWithReturn && period) {
     const targets = hits.slice(0, Math.min(filtered.length, ENRICH_CAP));
