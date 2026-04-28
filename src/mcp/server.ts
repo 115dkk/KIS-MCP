@@ -639,8 +639,8 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       "기본은 KIS 랭킹(시총/거래량/등락률 30건 cap) 후보군에서 키워드 필터링.",
       "useMasterPool=true (또는 instrumentType='etf'면 자동) → KOSPI+KOSDAQ 마스터파일(~4300종목)에서 검색 → 시총 30위 밖 종목·ETF도 발굴 가능.",
       "**인버스/레버리지/커버드콜/혼합형/선물형은 항상 자동 제외**.",
-      "excludeOverseas=true → 해외추종 ETF ~50개 키워드 추가 제외 (KODEX MSCI Korea는 화이트리스트로 생존).",
-      "excludeBonds=true → 채권/TDF/머니마켓 ETF 추가 제외 (주식 스크리닝 권장).",
+      "excludeOverseas=true → 해외추종 ETF 70+개 키워드 추가 제외 (브로드컴/샤오미/BYD/팔란티어/World 등 + 미국/나스닥/MSCI; KODEX MSCI Korea는 Korea 화이트리스트로 생존).",
+      "excludeBonds=true → **주식 아닌 자산** ETF 추가 제외 (채권/은행채/WGBI/TDF/머니마켓/리츠/부동산/인프라/원자재 등). 사용자가 '주식형 ETF' 요청 시 필수.",
       "rankBy=mcap만 시총 포함 (volume/fluctuation 랭킹과 마스터 풀에서는 minMcap 필터 무력).",
       "enrichWithReturn=true는 후보별 실제 수익률 병렬 계산(batch=5, 마스터 풀에서는 30건 cap, 워커 30s 보호).",
     ].join(" "),
@@ -687,7 +687,7 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
         .boolean()
         .optional()
         .describe(
-          "true면 채권/TDF/머니마켓 ETF 추가 제외 (채권/국고채/회사채/금리/TDF/머니마켓/CD금리/하이일드 등). 주식 스크리닝 시 권장",
+          "true면 **주식이 아닌 자산** ETF 추가 제외 — 채권(국고채/회사채/은행채/WGBI/하이일드) + TDF/머니마켓 + REIT/부동산/인프라 + 원자재(국제금/원유/구리/팔라듐/백금/천연가스/Silver). 사용자가 '주식형 ETF'를 요청했으면 켤 것",
         ),
       enrichWithReturn: z
         .boolean()
