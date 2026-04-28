@@ -115,3 +115,34 @@ describe("M0-3: 사전 정규화 캐시 효과", () => {
     expect(hits1).toEqual(hits2);
   });
 });
+
+describe("내부 캐시 필드(_norm) 비노출 (M0-3 부수효과 차단)", () => {
+  it("findByCode 결과에 _norm 필드 없음", () => {
+    const rec = findByCode("005930");
+    expect(rec).toBeDefined();
+    expect(Object.keys(rec!)).toEqual(["code", "name", "type", "market"]);
+    expect((rec as Record<string, unknown>)._norm).toBeUndefined();
+  });
+
+  it("findByName tier1/tier2/tier3 모두 _norm 미노출", () => {
+    // tier1 (정확)
+    const tier1 = findByName("삼성전자", { limit: 1 });
+    expect(tier1[0]).toBeDefined();
+    expect((tier1[0] as Record<string, unknown>)._norm).toBeUndefined();
+    expect(Object.keys(tier1[0]).sort()).toEqual(["code", "market", "matchTier", "name", "type"]);
+    // tier2 (prefix) + tier3 (substring) — KODEX 검색은 다양한 tier 혼합
+    const mixed = findByName("KODEX", { limit: 5 });
+    for (const hit of mixed) {
+      expect((hit as Record<string, unknown>)._norm).toBeUndefined();
+      expect(Object.keys(hit).sort()).toEqual(["code", "market", "matchTier", "name", "type"]);
+    }
+  });
+
+  it("listByFilter 결과에도 _norm 미노출", () => {
+    const etfs = listByFilter({ types: ["EF"] }).slice(0, 5);
+    for (const rec of etfs) {
+      expect((rec as Record<string, unknown>)._norm).toBeUndefined();
+      expect(Object.keys(rec).sort()).toEqual(["code", "market", "name", "type"]);
+    }
+  });
+});

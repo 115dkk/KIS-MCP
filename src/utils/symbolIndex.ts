@@ -87,9 +87,18 @@ export function getIndexMeta(): SymbolIndexMeta {
   };
 }
 
-/** 정확 코드 매칭 (6자리 숫자 권장). */
+/**
+ * IndexedRecord → SymbolRecord 변환 (외부 응답용).
+ * 내부 캐시 필드(_norm)를 제거. spread를 그대로 쓰면 _norm이 누설되는 버그 방지.
+ */
+function pureRecord(rec: IndexedRecord): SymbolRecord {
+  return { code: rec.code, name: rec.name, type: rec.type, market: rec.market };
+}
+
+/** 정확 코드 매칭 (6자리 숫자 권장). 내부 캐시 필드(_norm)는 제거하고 깨끗한 SymbolRecord 반환. */
 export function findByCode(code: string): SymbolRecord | undefined {
-  return byCode.get(code.trim().toUpperCase());
+  const rec = byCode.get(code.trim().toUpperCase());
+  return rec ? pureRecord(rec as IndexedRecord) : undefined;
 }
 
 export interface FindByNameOptions {
@@ -133,7 +142,8 @@ export function findByName(query: string, options: FindByNameOptions = {}): Name
   const exact = byNormalizedName.get(norm);
   if (exact) {
     for (const rec of exact) {
-      if (filter(rec)) tier1.push({ ...rec, matchTier: 1 });
+      // byNormalizedName은 IndexedRecord[]를 담고 있으므로 _norm을 제외하고 반환.
+      if (filter(rec)) tier1.push({ ...pureRecord(rec as IndexedRecord), matchTier: 1 });
     }
   }
 
@@ -142,8 +152,8 @@ export function findByName(query: string, options: FindByNameOptions = {}): Name
   for (const rec of indexed) {
     if (!filter(rec)) continue;
     if (rec._norm === norm) continue; // tier1에 이미 있음
-    if (rec._norm.startsWith(norm)) tier2.push({ ...rec, matchTier: 2 });
-    else if (rec._norm.includes(norm)) tier3.push({ ...rec, matchTier: 3 });
+    if (rec._norm.startsWith(norm)) tier2.push({ ...pureRecord(rec), matchTier: 2 });
+    else if (rec._norm.includes(norm)) tier3.push({ ...pureRecord(rec), matchTier: 3 });
   }
 
   const sortByName = (a: SymbolRecord, b: SymbolRecord) => a.name.localeCompare(b.name);
@@ -192,7 +202,10 @@ export async function loadSymbolIndexFromKv(kv: KVNamespace): Promise<IndexFile 
   return (raw as IndexFile | null) ?? null;
 }
 
-/** 분류 + 시장 필터로 전체 풀 반환 (advanced_search ETF 모드용 등). */
+/**
+ * 분류 + 시장 필터로 전체 풀 반환 (advanced_search ETF 모드용 등).
+ * 내부 캐시 필드(_norm)는 제거 — pureRecord()로 깨끗한 SymbolRecord만 반환.
+ */
 export function listByFilter(options: FindByNameOptions = {}): SymbolRecord[] {
   const typeSet = options.types && options.types.length ? new Set(options.types) : null;
   const marketSet = options.markets && options.markets.length ? new Set(options.markets) : null;
@@ -200,9 +213,7 @@ export function listByFilter(options: FindByNameOptions = {}): SymbolRecord[] {
   for (const rec of indexed) {
     if (typeSet && !typeSet.has(rec.type)) continue;
     if (marketSet && !marketSet.has(rec.market)) continue;
-    // _norm은 내부 캐시 — 외부에 노출하지 않음 (rec를 spread로 복사 시 _norm이 새 객체에 같이 가지만,
-    // SymbolRecord 타입에는 _norm이 없으므로 호출자에게는 보이지 않음).
-    result.push(rec);
+    result.push(pureRecord(rec));
   }
   return result;
 }
