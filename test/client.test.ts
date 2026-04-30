@@ -13,7 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { KisApiError, KisClient } from "../src/kis/client.js";
 
-class FakeKv implements Pick<KVNamespace, "get" | "put" | "delete"> {
+class FakeKv {
   store = new Map<string, string>();
   async get(key: string, type?: "json" | "text"): Promise<unknown> {
     const v = this.store.get(key);
@@ -46,6 +46,12 @@ const tokenResponse = (token: string) =>
 const okData = (output: unknown) =>
   new Response(
     JSON.stringify({ rt_cd: "0", msg_cd: "00000", msg1: "OK", output }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+
+const okEnvelope = (data: Record<string, unknown>) =>
+  new Response(
+    JSON.stringify({ rt_cd: "0", msg_cd: "00000", msg1: "OK", ...data }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 
@@ -150,6 +156,66 @@ describe("KisClient — 인증 + 재시도 + 캐싱", () => {
     // 빈 응답이 캐시되지 않았으므로 두 번째 호출이 새로운 데이터를 가져옴
     expect(res2.output).toEqual([{ data: 1 }]);
     expect(fetchSpy).toHaveBeenCalledTimes(3); // token + 2 data
+  });
+
+  it("M0-9 + M4: ETF 구성종목은 output1 메타만 있고 output2가 비면 캐싱하지 않음", async () => {
+    const path = "/uapi/etfetn/v1/quotations/inquire-component-stock-price";
+    fetchSpy
+      .mockResolvedValueOnce(tokenResponse("tok-1"))
+      .mockResolvedValueOnce(
+        okEnvelope({
+          output: [],
+          output1: { etf_cnfg_issu_cnt: "201", nav: "99715.86" },
+          output2: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        okEnvelope({
+          output: [],
+          output1: { etf_cnfg_issu_cnt: "201", nav: "99715.86" },
+          output2: [{ stck_shrn_iscd: "005930" }],
+        }),
+      );
+    const client = makeClient(kv);
+    const res1 = await client.get({
+      path,
+      trId: "FHKST121600C0",
+      query: { fid_input_iscd: "069500" },
+    });
+    expect(res1.output2).toEqual([]);
+
+    const res2 = await client.get({
+      path,
+      trId: "FHKST121600C0",
+      query: { fid_input_iscd: "069500" },
+    });
+    expect(res2.output2).toEqual([{ stck_shrn_iscd: "005930" }]);
+    expect(fetchSpy).toHaveBeenCalledTimes(3); // token + 2 data
+  });
+
+  it("M0-9 + M4: ETF 구성종목이 진짜 0개인 메타 응답은 캐싱 가능", async () => {
+    const path = "/uapi/etfetn/v1/quotations/inquire-component-stock-price";
+    fetchSpy
+      .mockResolvedValueOnce(tokenResponse("tok-1"))
+      .mockResolvedValueOnce(
+        okEnvelope({
+          output1: { etf_cnfg_issu_cnt: "0", nav: "10000" },
+          output2: [],
+        }),
+      );
+    const client = makeClient(kv);
+    await client.get({
+      path,
+      trId: "FHKST121600C0",
+      query: { fid_input_iscd: "252670" },
+    });
+    const res2 = await client.get({
+      path,
+      trId: "FHKST121600C0",
+      query: { fid_input_iscd: "252670" },
+    });
+    expect(res2.output1).toEqual({ etf_cnfg_issu_cnt: "0", nav: "10000" });
+    expect(fetchSpy).toHaveBeenCalledTimes(2); // token + 1 data; second is cache
   });
 
   it("EGW00201 (rate limit) 시 지수 백오프 후 재시도", async () => {

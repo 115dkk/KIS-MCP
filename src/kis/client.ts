@@ -149,19 +149,7 @@ export class KisClient {
 
       // ── M4: 성공 응답 캐싱 ──
       if (cacheKey && ttl) {
-        // ETF 구성종목 비결정적 빈 응답(M0-9)은 캐싱하면 안 됨 — output이 모두 비어 있으면 우회.
-        // 그래야 다음 호출에 정상 데이터가 잡힐 수 있음.
-        const outputs: unknown[] = [data.output, data.output1, data.output2];
-        const hasContent = outputs.some(
-          (o) =>
-            (Array.isArray(o) && o.length > 0) ||
-            (o !== null &&
-              o !== undefined &&
-              typeof o === "object" &&
-              !Array.isArray(o) &&
-              Object.keys(o as Record<string, unknown>).length > 0),
-        );
-        if (hasContent) {
+        if (isCacheableSuccess(opts.path, data)) {
           // fire-and-forget: KV put이 늦어도 응답은 즉시 반환
           void putToCache(this.kv, cacheKey, data, ttl.logicalSec, ttl.kvSec);
         }
@@ -206,6 +194,39 @@ function isRateLimitErrorCode(code: string | undefined): boolean {
   if (!code) return false;
   // EGW00201 = 초당 거래건수 초과, observed in KIS production.
   return code === "EGW00201" || code === "EGW00121";
+}
+
+function isCacheableSuccess(path: string, data: KisResponse<unknown>): boolean {
+  const lower = path.toLowerCase();
+
+  if (lower.includes("inquire-component-stock-price")) {
+    return hasEtfComponentPayload(data);
+  }
+
+  return [data.output, data.output1, data.output2].some(hasSubstantiveOutput);
+}
+
+function hasEtfComponentPayload(data: KisResponse<unknown>): boolean {
+  // ETF 구성종목 API는 output1에 메타, output2에 실제 구성종목 배열을 준다.
+  // output1만 있는 빈 output2를 캐싱하면 재시도가 같은 빈 응답을 되읽는다.
+  if (Array.isArray(data.output2) && data.output2.length > 0) return true;
+
+  const meta = data.output1;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
+
+  const expectedRaw = (meta as Record<string, unknown>).etf_cnfg_issu_cnt;
+  const expected = Number(String(expectedRaw ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(expected) && expected === 0;
+}
+
+function hasSubstantiveOutput(output: unknown): boolean {
+  if (Array.isArray(output)) return output.length > 0;
+  return (
+    output !== null &&
+    output !== undefined &&
+    typeof output === "object" &&
+    Object.keys(output as Record<string, unknown>).length > 0
+  );
 }
 
 function sleep(ms: number): Promise<void> {

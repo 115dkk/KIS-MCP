@@ -238,6 +238,7 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       "구성종목, 포트폴리오, 보유 종목, 비중 등의 질문에 사용.",
       "ETF 위험 분석을 위해 inspect_etf prompt 또는 get_credit_ratio와 함께 자주 사용됨.",
       "KIS API의 비결정적 빈 응답 특성상 최대 5회 재시도(지수 백오프)하며, 그래도 빈 응답이면 message 필드로 시도 로그와 함께 안내.",
+      "한투 응답 output2는 현재 상위 30개 수준으로 제한될 수 있으며, meta.expectedComponentCount는 ETF가 보고하는 전체 구성종목 수.",
       "파생/합성형 ETF는 진짜로 구성종목 정보가 없을 수 있음 (etf_cnfg_issu_cnt=0).",
     ].join(" "),
     {
@@ -248,7 +249,7 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
         .min(1)
         .max(200)
         .optional()
-        .describe("반환할 상위 구성종목 수 (기본 50, 상한 200)"),
+        .describe("반환할 상위 구성종목 수 (기본 50, 상한 200). 단, KIS output2가 실제로는 30개만 줄 수 있음"),
     },
     async (args) => {
       try {
@@ -642,7 +643,9 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       "excludeOverseas=true → 해외추종 ETF 70+개 키워드 추가 제외 (브로드컴/샤오미/BYD/팔란티어/World 등 + 미국/나스닥/MSCI; KODEX MSCI Korea는 Korea 화이트리스트로 생존).",
       "excludeBonds=true → **주식 아닌 자산** ETF 추가 제외 (채권/은행채/WGBI/TDF/머니마켓/리츠/부동산/인프라/원자재 등). 사용자가 '주식형 ETF' 요청 시 필수.",
       "rankBy=mcap만 시총 포함 (volume/fluctuation 랭킹과 마스터 풀에서는 minMcap 필터 무력).",
-      "enrichWithReturn=true는 후보별 실제 수익률 병렬 계산(batch=5, 마스터 풀에서는 30건 cap, 워커 30s 보호). enrichmentPeriod로 1M~5Y 지정 가능 (mcap/volume 풀의 N기간 정렬).",
+      "rankBy=return_*는 실제 기간 수익률 계산을 자동 수행.",
+      "마스터 풀이 30건을 넘는 return_* 랭킹은 샘플 순위를 반환하지 않으므로 sectorKeywords 등으로 후보를 좁힐 것.",
+      "enrichWithReturn=true는 mcap/volume 풀에서도 후보별 실제 수익률 병렬 계산(batch=5, 마스터 풀에서는 30건 cap, 워커 30s 보호). enrichmentPeriod로 1M~5Y 지정 가능.",
     ].join(" "),
     {
       instrumentType: z
@@ -692,7 +695,7 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       enrichWithReturn: z
         .boolean()
         .optional()
-        .describe("true면 후보 종목별 실제 기간 수익률 계산 후 재정렬 (느림). 마스터 풀에서는 상위 30건만 처리"),
+        .describe("true면 후보 종목별 실제 기간 수익률 계산 후 재정렬 (느림). rankBy=return_*에서는 자동 적용. 마스터 풀 mcap/volume 샘플은 상위 30건만 처리"),
       enrichmentPeriod: z
         .enum(["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD"])
         .optional()
@@ -913,8 +916,8 @@ function registerPrompts(server: McpServer): void {
               text: [
                 `업종 '${args.keyword}'을 분석해줘. 단계별 진행:`,
                 "",
-                `1. advanced_search({rankBy: 'mcap', instrumentType: 'stock', sectorKeywords: ['${args.keyword}'], limit: 10, useMasterPool: true, enrichWithReturn: true, rankBy: 'return_1y'})`,
-                `   → 마스터 풀에서 '${args.keyword}' 키워드 매칭 종목 + 1Y 수익률 enrichment.`,
+                `1. advanced_search({rankBy: 'return_1y', instrumentType: 'stock', sectorKeywords: ['${args.keyword}'], limit: 10, useMasterPool: true, enrichWithReturn: true})`,
+                `   → 마스터 풀에서 '${args.keyword}' 키워드 매칭 종목 + 1Y 수익률 enrichment. 후보가 30개를 넘으면 sectorKeywords를 더 좁혀 재호출.`,
                 `2. get_index({symbol: '${idx}'}) — 비교 지수 현재값`,
                 `3. get_index_chart({symbol: '${idx}', period: '1Y'}) — 지수 1년 시계열`,
                 `4. 상위 종목 5개에 get_fundamentals 호출 (병렬)`,

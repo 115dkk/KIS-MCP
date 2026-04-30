@@ -103,6 +103,7 @@ const RANK_RETURN_TO_PERIOD: Record<string, ReturnPeriod> = {
   return_3m: "3M",
   return_1m: "1M",
 };
+const MASTER_RETURN_ENRICH_CAP = 30;
 
 /** ETF 발행사 브랜드명. instrumentType='etf' 모드에서 자동 sectorKeywords로 사용. */
 const ETF_BRAND_KEYWORDS = [
@@ -210,18 +211,20 @@ export async function advancedSearch(
     rankFromKis: parseNum(c.data_rank) || i + 1,
   }));
 
-  // Optional return enrichment.
+  // Return enrichment.
   // rankBy=return_*면 매핑 사용. mcap/volume이면 enrichmentPeriod (기본 1Y) 사용.
+  const returnRankPeriod = RANK_RETURN_TO_PERIOD[input.rankBy];
   const period: ReturnPeriod | undefined =
-    RANK_RETURN_TO_PERIOD[input.rankBy] ??
+    returnRankPeriod ??
     (input.enrichWithReturn ? input.enrichmentPeriod ?? "1Y" : undefined);
+  const shouldEnrichReturn = period !== undefined && (input.enrichWithReturn === true || returnRankPeriod !== undefined);
 
   // **enrichment는 limit으로 자르기 전에 적용** — 그래야 30개 풀 전체의 N기간
   // 수익률로 정렬한 결과의 상위/하위 limit을 얻을 수 있음.
   // 자르고 나서 정렬하면 잘린 풀 안에서만 정렬되어 사용자 의도(전체 풀의 상위/하위)와 다름.
   // 30s wall-clock 보호: 풀 전체(~30개) 모두 enrichment.
   let trimmed: AdvancedSearchHit[];
-  if (input.enrichWithReturn && period) {
+  if (shouldEnrichReturn && period) {
     // batchParallel: 5건씩 병렬 호출 (레이트리미터 15/s 안전 마진).
     const batchResults = await batchParallel(
       baseHits,
@@ -241,7 +244,7 @@ export async function advancedSearch(
     trimmed = enriched.slice(0, limit);
     notes.push(
       `풀 전체 ${baseHits.length}개에 ${period} 수익률 병렬 계산(batch=5) 후 ${order} 정렬, 상위 ${trimmed.length}개 반환` +
-        (RANK_RETURN_TO_PERIOD[input.rankBy] ? "" : ` (rankBy=${input.rankBy} 풀의 ${period} 진짜 순위)`),
+        (returnRankPeriod ? ` (rankBy=${input.rankBy} 자동 enrichment)` : ` (rankBy=${input.rankBy} 풀의 ${period} 진짜 순위)`),
     );
   } else {
     trimmed = baseHits.slice(0, limit);
@@ -391,12 +394,12 @@ async function fetchVolumeRanking(client: KisClient): Promise<KisRankingItem[]> 
  *   1. 마스터에서 instrumentType에 맞는 종목분류로 1차 필터 (ST/EF/EN)
  *   2. excludeKeywords (기본 인버스/레버리지 등 + 사용자 추가) 제거
  *   3. sectorKeywords (있으면) include 필터
- *   4. enrichWithReturn=true이면 상위 N개에 대해 getReturn 호출 (rate-limit 보호 cap)
+ *   4. rankBy=return_* 또는 enrichWithReturn=true이면 getReturn 호출
  *   5. enrichment 결과로 정렬 (없으면 가나다순)
  *
  * KIS 랭킹과 차이점:
  *   - 시총·거래량 데이터 없음 (마스터에 미포함) → minMcap/rankBy=mcap/volume이 무력
- *     → enrichWithReturn=true와 rankBy=return_*만 의미 있음 (실제 수익률로 정렬)
+ *     → rankBy=return_*는 후보가 cap 이내일 때만 정확한 실제 수익률 정렬 가능
  *   - 풀 사이즈 무제한 (~4300) → 에코프로비엠/카카오 등 시총 30위 밖도 검색 가능
  *   - ETF 검색이 실제로 작동 (~1500개 EF/EN 풀)
  */
@@ -458,17 +461,33 @@ async function advancedSearchViaMaster(
     rankFromKis: i + 1,
   }));
 
-  // enrichment: rankBy=return_*면 매핑 사용. mcap/volume이면 enrichmentPeriod 사용.
+  // enrichment: rankBy=return_*면 자동 적용. mcap/volume이면 enrichWithReturn=true일 때만 적용.
   // 마스터 풀이 크므로 호출 보호.
+  const returnRankPeriod = RANK_RETURN_TO_PERIOD[input.rankBy];
   const period: ReturnPeriod | undefined =
-    RANK_RETURN_TO_PERIOD[input.rankBy] ??
+    returnRankPeriod ??
     (input.enrichWithReturn ? input.enrichmentPeriod ?? "1Y" : undefined);
-  const ENRICH_CAP = 30; // rate-limit + 30s wall-clock 안전 마진
-  if (input.enrichWithReturn && period) {
-    const targets = hits.slice(0, Math.min(filtered.length, ENRICH_CAP));
+  const shouldEnrichReturn = period !== undefined && (input.enrichWithReturn === true || returnRankPeriod !== undefined);
+  if (shouldEnrichReturn && period) {
+    if (returnRankPeriod && filtered.length > MASTER_RETURN_ENRICH_CAP) {
+      notes.push(
+        `rankBy=${input.rankBy}은 ${period} 실제 수익률 랭킹이 필요하지만, 마스터 후보가 ${filtered.length}개라 ` +
+          `워커 안전 한도(${MASTER_RETURN_ENRICH_CAP}개)를 초과합니다. 샘플 30개 순위를 진짜 순위처럼 반환하지 않도록 결과를 비웠습니다. ` +
+          "sectorKeywords/excludeKeywords/excludeBonds/excludeOverseas로 후보를 30개 이하로 좁혀 다시 호출하세요.",
+      );
+      return {
+        query: input,
+        pulled,
+        afterFilters: filtered.length,
+        hits: [],
+        notes,
+      };
+    }
+
+    const targets = hits.slice(0, Math.min(filtered.length, MASTER_RETURN_ENRICH_CAP));
     if (targets.length < filtered.length) {
       notes.push(
-        `enrichWithReturn 대상이 ${ENRICH_CAP}건으로 제한됩니다 (워커 30s wall-clock 보호). ` +
+        `enrichWithReturn 대상이 ${MASTER_RETURN_ENRICH_CAP}건으로 제한됩니다 (워커 30s wall-clock 보호). ` +
           `더 좁은 후보가 필요하면 sectorKeywords로 필터링하세요.`,
       );
     }
@@ -496,7 +515,10 @@ async function advancedSearchViaMaster(
       return order === "asc" ? av - bv : bv - av;
     });
     hits = enriched.slice(0, limit);
-    notes.push(`상위 ${hits.length}개에 대해 ${period} 수익률 계산 후 정렬.`);
+    notes.push(
+      `${targets.length}개 후보에 대해 ${period} 수익률 계산 후 ${order} 정렬, 상위 ${hits.length}개 반환` +
+        (returnRankPeriod ? ` (rankBy=${input.rankBy} 자동 enrichment)` : ""),
+    );
   } else {
     // 정렬 없이 가나다순 (마스터 풀의 deterministic 출력)
     hits = hits.slice(0, limit);

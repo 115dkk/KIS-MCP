@@ -320,7 +320,9 @@
 - 후보군: KOSPI+KOSDAQ 마스터 **~4300종목** (주식 ~2700, ETF ~1100, ETN ~400)
 - 시총·거래량·가격 데이터 **없음** (마스터에 미포함) → minMcap 무력
 - 모든 ETF/소형주 검색 가능
-- `enrichWithReturn=true` 시 상위 30건에 대해 실제 수익률 계산 후 정렬 (워커 30s 보호)
+- `rankBy=return_*`는 실제 수익률 계산을 자동 수행
+- 마스터 후보가 30건을 넘는 `return_*` 랭킹은 샘플 순위를 반환하지 않음. `sectorKeywords` 등으로 후보를 좁혀야 함
+- `rankBy=mcap/volume`에서 `enrichWithReturn=true`를 주면 상위 30건에 대해 실제 수익률 계산 후 정렬 (워커 30s 보호)
 
 
 
@@ -336,9 +338,9 @@
 | `sectorKeywords` | `string[]` | 종목명에 하나라도 포함되어야 함 |
 | `excludeKeywords` | `string[]` | 추가 제외 키워드 |
 | `minMcap` | number | 시총 하한 (한투 hts_avls 단위) |
-| `maxPer` | number | (계획됨, 추후 enrichment에서 필터) |
+| `maxPer` | number | `enrichWithFundamentals=true`일 때 PER 상한 필터 |
 | `excludeOverseas` | boolean | true 시 미국/나스닥/중국 등 해외추종 ETF 제외 |
-| `enrichWithReturn` | boolean | true 시 후보 종목별 실제 수익률 계산(느림) |
+| `enrichWithReturn` | boolean | true 시 후보 종목별 실제 수익률 계산(느림). `rankBy=return_*`에서는 자동 적용 |
 
 **기본 자동 제외 키워드:** `인버스`, `레버리지`, `2X`, `3X`, `Inverse`, `Leverage`, `커버드콜`, `CoveredCall`, `채권혼합`, `혼합`, `밸런스`, `선물`, `Futures`.
 
