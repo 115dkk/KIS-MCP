@@ -22,6 +22,13 @@ import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart
 import { downsample, parseNum } from "../utils/downsample.js";
 import { extractArray, extractObject } from "../utils/kisResponse.js";
 import { resolveAlias, type MarketAlias } from "../utils/marketCodes.js";
+import {
+  currentBusinessYmdKst,
+  shiftBusinessMonthsYmd,
+  shiftBusinessYearsYmd,
+  subtractBusinessDaysYmd,
+  ytdBusinessStartYmd,
+} from "../utils/businessDay.js";
 
 const VALID_INTERVALS: IntervalMinutes[] = [1, 3, 5, 10, 15, 30, 60];
 
@@ -88,44 +95,36 @@ export interface IndexChartResult {
 
 // ─────────────────────── 공통 유틸 ───────────────────────
 
-function formatYmd(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const m = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
 function periodToRange(period: IndexPeriod): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = new Date(today);
+  const endDate = currentBusinessYmdKst();
+  let startDate = endDate;
   switch (period) {
     case "minute":
       // 분봉은 당일만 (range 의미 없음)
       break;
     case "1M":
-      start.setUTCMonth(start.getUTCMonth() - 1);
+      startDate = shiftBusinessMonthsYmd(endDate, -1);
       break;
     case "3M":
-      start.setUTCMonth(start.getUTCMonth() - 3);
+      startDate = shiftBusinessMonthsYmd(endDate, -3);
       break;
     case "6M":
-      start.setUTCMonth(start.getUTCMonth() - 6);
+      startDate = shiftBusinessMonthsYmd(endDate, -6);
       break;
     case "1Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 1);
+      startDate = shiftBusinessYearsYmd(endDate, -1);
       break;
     case "3Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 3);
+      startDate = shiftBusinessYearsYmd(endDate, -3);
       break;
     case "5Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 5);
+      startDate = shiftBusinessYearsYmd(endDate, -5);
       break;
     case "YTD":
-      start.setUTCMonth(0);
-      start.setUTCDate(1);
+      startDate = ytdBusinessStartYmd(endDate);
       break;
   }
-  return { startDate: formatYmd(start), endDate: formatYmd(today) };
+  return { startDate, endDate };
 }
 
 /**
@@ -228,17 +227,16 @@ async function fetchOverseasIndex(
 ): Promise<IndexResult> {
   // 해외지수 "현재값"은 별도 endpoint가 없어 chartprice를 D 단위로 호출 후 마지막 종가 사용.
   // 7일 윈도우 → 휴장 고려.
-  const today = new Date();
-  const start = new Date(today);
-  start.setUTCDate(start.getUTCDate() - 7);
+  const today = currentBusinessYmdKst();
+  const start = subtractBusinessDaysYmd(today, 7);
   const res = await client.get<KisOverseasChartItem[] | KisOverseasChartMeta>({
     path: KIS.overseasChartPrice.path,
     trId: KIS.overseasChartPrice.trIdReal,
     query: {
       fid_cond_mrkt_div_code: alias.mrkt!,
       fid_input_iscd: alias.iscd!,
-      fid_input_date_1: formatYmd(start),
-      fid_input_date_2: formatYmd(today),
+      fid_input_date_1: start,
+      fid_input_date_2: today,
       fid_period_div_code: "D",
     },
   });
@@ -449,7 +447,7 @@ async function fetchDomesticIndexMinute(
     },
   });
   const items = extractArray<KisIndexMinuteItem>(res);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = currentBusinessYmdKst().replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3");
   const oneMin = items
     .map((it) => domesticIndexMinuteToPoint(it, today))
     .filter((p): p is ChartPoint => p !== null)

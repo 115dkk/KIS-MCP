@@ -35,7 +35,9 @@ export interface EtfComponent {
 
 export interface EtfMeta {
   /** ETF가 보고하는 실제 구성종목 수 (etf_cnfg_issu_cnt). 0이면 derivative/합성형. */
-  expectedComponentCount: number;
+  expectedComponentCount?: number;
+  hasExpectedComponentCount: boolean;
+  isDerivative: boolean;
   /** 추적 NAV (output1.nav). */
   nav?: number;
   /** ETF 순자산 총액 (etf_ntas_ttam). */
@@ -48,6 +50,9 @@ export interface EtfComponentsResult {
   etfSymbol: string;
   totalCount: number;
   totalWeightPct: number;
+  returnedCount: number;
+  returnedWeightPct: number;
+  coverageWeightPct?: number;
   topNCount: number;
   topNWeightPct: number;
   components: EtfComponent[];
@@ -80,7 +85,7 @@ interface AttemptLog {
   emptyOutput: boolean;
   emptyOutput1: boolean;
   emptyOutput2: boolean;
-  expectedComponentCount: number;
+  expectedComponentCount?: number;
 }
 
 export async function getEtfComponents(
@@ -118,15 +123,15 @@ export async function getEtfComponents(
     attemptLog.push({
       attempt: attempts,
       emptyOutput: !Array.isArray(res.output) || res.output.length === 0,
-      emptyOutput1: !Array.isArray(res.output1) || (res.output1 as unknown[]).length === 0,
+      emptyOutput1: !hasPayload(res.output1),
       emptyOutput2: !Array.isArray(res.output2) || (res.output2 as unknown[]).length === 0,
-      expectedComponentCount: lastMeta?.expectedComponentCount ?? -1,
+      expectedComponentCount: lastMeta?.expectedComponentCount,
     });
 
     if (lastItems.length > 0) break;
 
     // output1.etf_cnfg_issu_cnt === 0 → 진짜 derivative ETF, 재시도 무의미
-    if (lastMeta && lastMeta.expectedComponentCount === 0) {
+    if (lastMeta?.isDerivative) {
       isDerivative = true;
       break;
     }
@@ -144,6 +149,9 @@ export async function getEtfComponents(
         etfSymbol: symbol,
         totalCount: 0,
         totalWeightPct: 0,
+        returnedCount: 0,
+        returnedWeightPct: 0,
+        coverageWeightPct: 0,
         topNCount: 0,
         topNWeightPct: 0,
         components: [],
@@ -153,7 +161,7 @@ export async function getEtfComponents(
           "이 ETF는 파생/합성형 (선물·스왑 등) 기반이라 개별 구성종목 정보가 없습니다. 추적 지수와 NAV는 get_quote로 확인하세요.",
       };
     }
-    const expected = lastMeta?.expectedComponentCount ?? 0;
+    const expected = lastMeta?.expectedComponentCount ?? "unknown";
     // M0-9: attemptLog를 message에 부착하여 디버깅 가시성 확보.
     const attemptSummary = attemptLog
       .map(
@@ -165,6 +173,9 @@ export async function getEtfComponents(
       etfSymbol: symbol,
       totalCount: 0,
       totalWeightPct: 0,
+      returnedCount: 0,
+      returnedWeightPct: 0,
+      coverageWeightPct: 0,
       topNCount: 0,
       topNWeightPct: 0,
       components: [],
@@ -181,11 +192,16 @@ export async function getEtfComponents(
   const totalWeight = all.reduce((s, c) => s + c.weightPct, 0);
   const top = all.slice(0, limit);
   const topWeight = top.reduce((s, c) => s + c.weightPct, 0);
+  const expected = lastMeta?.expectedComponentCount;
 
   return {
     etfSymbol: symbol,
     totalCount: all.length,
     totalWeightPct: round2(totalWeight),
+    returnedCount: all.length,
+    returnedWeightPct: round2(totalWeight),
+    coverageWeightPct:
+      expected && expected > 0 ? round2(Math.min((all.length / expected) * 100, 100)) : undefined,
     topNCount: top.length,
     topNWeightPct: round2(topWeight),
     components: top,
@@ -205,9 +221,13 @@ function parseEtfMeta(res: KisResponse<unknown>): EtfMeta | undefined {
   const candidate =
     !Array.isArray(res.output1) && typeof res.output1 === "object" ? (res.output1 as KisEtfComponentMeta) : null;
   if (!candidate) return undefined;
-  const expected = parseNum(candidate.etf_cnfg_issu_cnt);
+  const expectedRaw = candidate.etf_cnfg_issu_cnt?.trim();
+  const expected = expectedRaw ? parseNum(expectedRaw) : NaN;
+  const hasExpectedComponentCount = Number.isFinite(expected);
   return {
-    expectedComponentCount: Number.isFinite(expected) ? expected : 0,
+    expectedComponentCount: hasExpectedComponentCount ? expected : undefined,
+    hasExpectedComponentCount,
+    isDerivative: hasExpectedComponentCount && expected === 0,
     nav: numOrUndef(parseNum(candidate.nav)),
     netAssets: numOrUndef(parseNum(candidate.etf_ntas_ttam)),
     cuUnitSecCount: numOrUndef(parseNum(candidate.etf_cu_unit_scrt_cnt)),
@@ -231,6 +251,11 @@ function round2(n: number): number {
 
 function numOrUndef(n: number): number | undefined {
   return Number.isFinite(n) && n !== 0 ? n : undefined;
+}
+
+function hasPayload(output: unknown): boolean {
+  if (Array.isArray(output)) return output.length > 0;
+  return output !== null && output !== undefined && typeof output === "object";
 }
 
 function sleep(ms: number): Promise<void> {

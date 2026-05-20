@@ -215,7 +215,10 @@ function hasEtfComponentPayload(data: KisResponse<unknown>): boolean {
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
 
   const expectedRaw = (meta as Record<string, unknown>).etf_cnfg_issu_cnt;
-  const expected = Number(String(expectedRaw ?? "").replace(/,/g, "").trim());
+  if (expectedRaw === undefined || expectedRaw === null) return false;
+  const expectedText = String(expectedRaw).replace(/,/g, "").trim();
+  if (expectedText === "") return false;
+  const expected = Number(expectedText);
   return Number.isFinite(expected) && expected === 0;
 }
 

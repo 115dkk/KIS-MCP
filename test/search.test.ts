@@ -38,6 +38,8 @@ const chart = (startClose: number, endClose: number) => [
 
 describe("advancedSearch", () => {
   it("rankBy=return_*는 enrichWithReturn 없이도 실제 수익률로 정렬", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-30T03:00:00.000Z"));
     const get = vi.fn(async (opts: { path: string; query?: Record<string, string> }) => {
       if (opts.path === KIS.fluctuationRank.path) {
         return env({
@@ -80,6 +82,7 @@ describe("advancedSearch", () => {
     expect(result.hits.map((h) => h.enrichedReturnPct)).toEqual([-10, 20]);
     expect(result.notes.join(" ")).toContain("rankBy=return_1y 자동 enrichment");
     expect(get).toHaveBeenCalledTimes(3); // ranking + 2 chart calls
+    vi.useRealTimers();
   });
 
   it("마스터 풀 return 랭킹이 cap을 넘으면 샘플 순위를 반환하지 않음", async () => {

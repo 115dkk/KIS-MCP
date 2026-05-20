@@ -19,6 +19,13 @@ import type { ChartPoint } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
 import { extractArray, extractObject } from "../utils/kisResponse.js";
 import { resolveAlias, type MarketAlias } from "../utils/marketCodes.js";
+import {
+  currentBusinessYmdKst,
+  shiftBusinessMonthsYmd,
+  shiftBusinessYearsYmd,
+  subtractBusinessDaysYmd,
+  ytdBusinessStartYmd,
+} from "../utils/businessDay.js";
 
 export interface GetFxInput {
   /** USDKRW, 원달러, JPYKRW 등 alias 또는 한투 ISCD raw */
@@ -65,41 +72,33 @@ export interface FxChartResult {
   notes?: string[];
 }
 
-function formatYmd(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const m = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
 function periodToRange(period: FxPeriod): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = new Date(today);
+  const endDate = currentBusinessYmdKst();
+  let startDate = endDate;
   switch (period) {
     case "1M":
-      start.setUTCMonth(start.getUTCMonth() - 1);
+      startDate = shiftBusinessMonthsYmd(endDate, -1);
       break;
     case "3M":
-      start.setUTCMonth(start.getUTCMonth() - 3);
+      startDate = shiftBusinessMonthsYmd(endDate, -3);
       break;
     case "6M":
-      start.setUTCMonth(start.getUTCMonth() - 6);
+      startDate = shiftBusinessMonthsYmd(endDate, -6);
       break;
     case "1Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 1);
+      startDate = shiftBusinessYearsYmd(endDate, -1);
       break;
     case "3Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 3);
+      startDate = shiftBusinessYearsYmd(endDate, -3);
       break;
     case "5Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 5);
+      startDate = shiftBusinessYearsYmd(endDate, -5);
       break;
     case "YTD":
-      start.setUTCMonth(0);
-      start.setUTCDate(1);
+      startDate = ytdBusinessStartYmd(endDate);
       break;
   }
-  return { startDate: formatYmd(start), endDate: formatYmd(today) };
+  return { startDate, endDate };
 }
 
 /** alias 매칭 → fx 카테고리 강제. raw 입력은 fx 카테고리 가정 + ISCD 그대로 사용. */
@@ -132,9 +131,8 @@ export async function getFx(client: KisClient, input: GetFxInput): Promise<FxRes
   const alias = resolveFxInput(input.pair);
 
   // 최근 7일 차트 호출 → 마지막 종가 = 현재값
-  const today = new Date();
-  const start = new Date(today);
-  start.setUTCDate(start.getUTCDate() - 7);
+  const today = currentBusinessYmdKst();
+  const start = subtractBusinessDaysYmd(today, 7);
 
   const res = await client.get<KisOverseasChartItem[] | KisOverseasChartMeta>({
     path: KIS.overseasChartPrice.path,
@@ -142,8 +140,8 @@ export async function getFx(client: KisClient, input: GetFxInput): Promise<FxRes
     query: {
       fid_cond_mrkt_div_code: alias.mrkt!,
       fid_input_iscd: alias.iscd!,
-      fid_input_date_1: formatYmd(start),
-      fid_input_date_2: formatYmd(today),
+      fid_input_date_1: start,
+      fid_input_date_2: today,
       fid_period_div_code: "D",
     },
   });
@@ -168,7 +166,7 @@ export async function getFx(client: KisClient, input: GetFxInput): Promise<FxRes
         change: c,
         changeFormatted: c !== undefined ? c.toFixed(2) : undefined,
         changeRate: numOrUndef(parseNum(meta.ovrs_nmix_prdy_ctrt)),
-        asOf: new Date().toISOString().slice(0, 10),
+        asOf: today.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
         unit: alias.unit,
         source: "kis-overseas-chartprice",
         notes: ["일자별 시계열 응답이 비어있어 메타 필드(output1)에서 추출했습니다."],

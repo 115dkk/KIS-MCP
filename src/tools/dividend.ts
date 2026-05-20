@@ -15,6 +15,11 @@ import type { KisDividendItem, KisStockPriceOutput } from "../kis/types.js";
 import { parseNum } from "../utils/downsample.js";
 import { extractArrayWithObjectFallback } from "../utils/kisResponse.js";
 import { normalizeSymbol } from "../utils/symbol.js";
+import {
+  currentBusinessYmdKst,
+  shiftBusinessMonthsYmd,
+  shiftBusinessYearsYmd,
+} from "../utils/businessDay.js";
 
 export interface GetDividendInput {
   symbol: string;
@@ -57,13 +62,6 @@ const KIND_MAP: Record<NonNullable<GetDividendInput["dividendKind"]>, string> = 
   interim: "2",
 };
 
-function ymd(d: Date): string {
-  return `${d.getUTCFullYear()}${(d.getUTCMonth() + 1).toString().padStart(2, "0")}${d
-    .getUTCDate()
-    .toString()
-    .padStart(2, "0")}`;
-}
-
 export async function getDividend(
   client: KisClient,
   input: GetDividendInput,
@@ -72,9 +70,8 @@ export async function getDividend(
   const months = Math.min(Math.max(input.lookbackMonths ?? 12, 1), 36);
   const kind = KIND_MAP[input.dividendKind ?? "all"];
 
-  const today = new Date();
-  const start = new Date(today);
-  start.setUTCMonth(start.getUTCMonth() - months);
+  const today = currentBusinessYmdKst();
+  const start = shiftBusinessMonthsYmd(today, -months);
 
   const [divRes, priceRes] = await Promise.all([
     client
@@ -85,8 +82,8 @@ export async function getDividend(
         query: {
           cts: "",
           gb1: kind,
-          f_dt: ymd(start),
-          t_dt: ymd(today),
+          f_dt: start,
+          t_dt: today,
           sht_cd: symbol,
           high_gb: "",
         },
@@ -146,10 +143,8 @@ function toRecord(item: KisDividendItem): DividendRecord | null {
   };
 }
 
-function sumTtm(records: DividendRecord[], today: Date): number {
-  const oneYearAgo = new Date(today);
-  oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1);
-  const cutoff = ymd(oneYearAgo);
+function sumTtm(records: DividendRecord[], todayYmd: string): number {
+  const cutoff = shiftBusinessYearsYmd(todayYmd, -1);
   let sum = 0;
   for (const r of records) {
     if (r.recordDate >= cutoff && Number.isFinite(r.cashDividendPerShare)) {

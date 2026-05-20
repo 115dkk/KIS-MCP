@@ -28,6 +28,13 @@ import {
   resolveAlias,
   type MarketAlias,
 } from "../utils/marketCodes.js";
+import {
+  currentBusinessYmdKst,
+  shiftBusinessMonthsYmd,
+  shiftBusinessYearsYmd,
+  subtractBusinessDaysYmd,
+  ytdBusinessStartYmd,
+} from "../utils/businessDay.js";
 
 const VALID_INTERVALS: IntervalMinutes[] = [1, 3, 5, 10, 15, 30, 60];
 const MAX_FUTURES_MINUTE_PAGES = 10; // 페이지당 최대 120건 → 최대 1200 raw points
@@ -84,44 +91,36 @@ export interface CommodityChartResult {
   notes?: string[];
 }
 
-function formatYmd(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const m = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
 function periodToRange(period: CommodityPeriod): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = new Date(today);
+  const endDate = currentBusinessYmdKst();
+  let startDate = endDate;
   switch (period) {
     case "minute":
       // 분봉은 range 의미 없음. 페이지네이션이 종료일자(close) 기준 역방향이라 endDate=today만 의미.
       break;
     case "1M":
-      start.setUTCMonth(start.getUTCMonth() - 1);
+      startDate = shiftBusinessMonthsYmd(endDate, -1);
       break;
     case "3M":
-      start.setUTCMonth(start.getUTCMonth() - 3);
+      startDate = shiftBusinessMonthsYmd(endDate, -3);
       break;
     case "6M":
-      start.setUTCMonth(start.getUTCMonth() - 6);
+      startDate = shiftBusinessMonthsYmd(endDate, -6);
       break;
     case "1Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 1);
+      startDate = shiftBusinessYearsYmd(endDate, -1);
       break;
     case "3Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 3);
+      startDate = shiftBusinessYearsYmd(endDate, -3);
       break;
     case "5Y":
-      start.setUTCFullYear(start.getUTCFullYear() - 5);
+      startDate = shiftBusinessYearsYmd(endDate, -5);
       break;
     case "YTD":
-      start.setUTCMonth(0);
-      start.setUTCDate(1);
+      startDate = ytdBusinessStartYmd(endDate);
       break;
   }
-  return { startDate: formatYmd(start), endDate: formatYmd(today) };
+  return { startDate, endDate };
 }
 
 /**
@@ -225,7 +224,7 @@ async function fetchFuturesCurrent(
   const changeRate = numOrUndef(parseNum(o.prdy_ctrt)); // changeRate는 % 단위라 소수점 보정 없음
   const asOf = o.proc_date
     ? `${o.proc_date.slice(0, 4)}-${o.proc_date.slice(4, 6)}-${o.proc_date.slice(6, 8)}`
-    : new Date().toISOString().slice(0, 10);
+    : currentBusinessYmdKst().replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3");
 
   return {
     input: inputSymbol,
@@ -259,9 +258,8 @@ async function fetchSpotCurrent(
   alias: MarketAlias,
   resolvedCode: string,
 ): Promise<CommodityResult> {
-  const today = new Date();
-  const start = new Date(today);
-  start.setUTCDate(start.getUTCDate() - 14); // 금시장은 휴장일 많음 → 2주 윈도우
+  const today = currentBusinessYmdKst();
+  const start = subtractBusinessDaysYmd(today, 14); // 금시장은 휴장일 많음 → 2주 윈도우
 
   const res = await client.get<KisOverseasChartItem[]>({
     path: KIS.overseasChartPrice.path,
@@ -269,8 +267,8 @@ async function fetchSpotCurrent(
     query: {
       fid_cond_mrkt_div_code: alias.mrkt!,
       fid_input_iscd: resolvedCode,
-      fid_input_date_1: formatYmd(start),
-      fid_input_date_2: formatYmd(today),
+      fid_input_date_1: start,
+      fid_input_date_2: today,
       fid_period_div_code: "D",
     },
   });

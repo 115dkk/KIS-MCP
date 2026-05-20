@@ -35,6 +35,36 @@
 
 ---
 
+## `get_etf_nav_trend`
+
+**When to use:** ETF/ETN의 가격, NAV, 괴리율(`discountPct`)을 같이 확인할 때 사용합니다.
+
+**Input:** `{ symbol: string, mode?: "snapshot"|"daily"|"minute", startDate?: "YYYYMMDD", endDate?: "YYYYMMDD", intervalMinutes?: 1|3|5|10|15|30|60|120, maxPoints?: number }`
+
+**Notes:** `daily` 날짜 범위는 영업일 기준으로 보정됩니다. `minute`는 KIS가 제공하는 당일 분별 NAV 비교 데이터를 반환합니다.
+
+---
+
+## `get_credit_rank`
+
+**When to use:** 신용잔고율 상위/증가 상위, 공매도 거래비중 상위 종목을 빠르게 스크리닝할 때 사용합니다.
+
+**Input:** `{ kind?: "credit_balance"|"short_sale", market?: "all"|"kospi"|"kosdaq"|"kospi200"|"kosdaq150", sortBy?: string, lookbackDays?: number, limit?: number, excludeEtfLike?: boolean }`
+
+**Notes:** ETF형/파생형 이름은 기본 제외합니다. 세부 위험 분석은 `get_credit_ratio`로 이어서 확인합니다.
+
+---
+
+## `get_trading_status`
+
+**When to use:** 투자주의, 거래정지, 공매도 과열, 관리종목, VI 등 종목 상태 플래그를 확인할 때 사용합니다.
+
+**Input:** `{ symbol: string }`
+
+**Notes:** `inquire-price`의 조회 응답만 사용하며 주문/잔고/계좌 API는 호출하지 않습니다.
+
+---
+
 ## 종목코드 형식
 
 `symbol` 파라미터는 **1~12자 영숫자**. 입력 시 자동으로 trim + 대문자 변환됩니다.

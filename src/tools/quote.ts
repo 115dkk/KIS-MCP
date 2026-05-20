@@ -22,6 +22,7 @@ export interface GetQuoteInput {
 
 export interface QuoteResult {
   symbol: string;
+  name?: string;
   /** 업종/카테고리 분류명. KIS inquire-price는 종목명을 직접 반환하지 않음. */
   sector: string;
   market: string;
@@ -139,6 +140,7 @@ function mapStockOutput(symbol: string, o: Partial<KisStockPriceOutput>): QuoteR
 
   return {
     symbol,
+    name: findByCode(symbol)?.name,
     sector: o.bstp_kor_isnm ?? "",
     market: o.rprs_mrkt_kor_name ?? "",
     price: parseNum(o.stck_prpr),
@@ -172,12 +174,13 @@ function mapEtfOutput(symbol: string, o: Partial<KisEtfPriceOutput>): QuoteResul
     componentCount: parseNum(o.etf_cnfg_issu_cnt),
     lpHoldingRatePct: parseNum(o.lp_hldn_rate),
     foreignHoldingRatePct: parseNum(o.frgn_hldn_qty_rate),
-  });
+  }, { dropZero: false });
   if (o.etf_dvdn_cycl) etfMetrics.dividendCycle = o.etf_dvdn_cycl;
   if (o.etf_rprs_bstp_kor_isnm) etfMetrics.representativeSector = o.etf_rprs_bstp_kor_isnm;
 
   return {
     symbol,
+    name: findByCode(symbol)?.name,
     sector: o.bstp_kor_isnm ?? "",
     market: "",
     price: parseNum(o.stck_prpr),
@@ -199,11 +202,15 @@ function mapEtfOutput(symbol: string, o: Partial<KisEtfPriceOutput>): QuoteResul
   };
 }
 
-function pruneNumeric<T extends Record<string, number | undefined | string>>(obj: T): T {
+function pruneNumeric<T extends Record<string, number | undefined | string>>(
+  obj: T,
+  options: { dropZero?: boolean } = {},
+): T {
+  const dropZero = options.dropZero ?? true;
   const out: Record<string, number | string> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (typeof v === "string" && v) out[k] = v;
-    else if (typeof v === "number" && Number.isFinite(v) && v !== 0) out[k] = v;
+    else if (typeof v === "number" && Number.isFinite(v) && (!dropZero || v !== 0)) out[k] = v;
   }
   return out as T;
 }

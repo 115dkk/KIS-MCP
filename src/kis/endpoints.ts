@@ -45,6 +45,14 @@ export const KIS = {
     path: "/uapi/domestic-stock/v1/quotations/volume-rank",
     trIdReal: "FHPST01710000",
   },
+  creditBalanceRank: {
+    path: "/uapi/domestic-stock/v1/ranking/credit-balance",
+    trIdReal: "FHKST17010000",
+  },
+  shortSaleRank: {
+    path: "/uapi/domestic-stock/v1/ranking/short-sale",
+    trIdReal: "FHPST04820000",
+  },
 
   // Dividend (예탁원 정보)
   /**
@@ -86,6 +94,18 @@ export const KIS = {
   etfComponents: {
     path: "/uapi/etfetn/v1/quotations/inquire-component-stock-price",
     trIdReal: "FHKST121600C0",
+  },
+  etfNavSnapshot: {
+    path: "/uapi/etfetn/v1/quotations/nav-comparison-trend",
+    trIdReal: "FHPST02440000",
+  },
+  etfNavDailyTrend: {
+    path: "/uapi/etfetn/v1/quotations/nav-comparison-daily-trend",
+    trIdReal: "FHPST02440200",
+  },
+  etfNavTimeTrend: {
+    path: "/uapi/etfetn/v1/quotations/nav-comparison-time-trend",
+    trIdReal: "FHPST02440100",
   },
 
   // ─── Market indices (domestic 업종지수) ───

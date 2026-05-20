@@ -32,6 +32,8 @@ import { extractArray } from "../utils/kisResponse.js";
 import { getEtfComponents } from "./etf.js";
 import { isExcludedByKeyword } from "../utils/filters.js";
 import { isValidSymbol, normalizeSymbol } from "../utils/symbol.js";
+import { currentBusinessYmdKst, subtractBusinessDaysYmd } from "../utils/businessDay.js";
+import { findByCode } from "../utils/symbolIndex.js";
 
 export interface GetCreditRatioInput {
   symbol: string;
@@ -92,6 +94,12 @@ export interface CreditRatioStock {
 export interface CreditRatioEtfAggregate {
   componentsAnalyzed: number;
   componentsSkipped: number;
+  analyzedWeightPct: number;
+  skippedWeightPct: number;
+  returnedWeightPct: number;
+  expectedComponentCount?: number;
+  returnedComponentCount: number;
+  dataIssueCount: number;
   weightedAvg: {
     creditBalanceRatioPct?: number;
     creditContributionRatioPct?: number;
@@ -142,11 +150,9 @@ function looksLikeEtfByName(name: string): boolean {
   return ETF_NAME_HINTS.some((h) => upper.includes(h));
 }
 
-function ymd(d: Date): string {
-  return `${d.getUTCFullYear()}${(d.getUTCMonth() + 1).toString().padStart(2, "0")}${d
-    .getUTCDate()
-    .toString()
-    .padStart(2, "0")}`;
+function isEtfByMaster(symbol: string): boolean {
+  const rec = findByCode(symbol);
+  return !!rec && (rec.type === "EF" || rec.type === "EN" || rec.type === "BC");
 }
 
 export async function getCreditRatio(
@@ -162,7 +168,8 @@ export async function getCreditRatio(
   const stockMetrics = await fetchStockMetrics(client, symbol, lookbackDays);
 
   const isLikelyEtf =
-    requested === "etf" || (requested === "auto" && looksLikeEtfByName(stockMetrics?.sector ?? ""));
+    requested === "etf" ||
+    (requested === "auto" && (isEtfByMaster(symbol) || looksLikeEtfByName(stockMetrics?.sector ?? "")));
 
   if (!isLikelyEtf) {
     return {
@@ -192,6 +199,11 @@ export async function getCreditRatio(
     (c) => isValidSymbol(c.symbol) && !isExcludedByKeyword(c.name),
   );
   let skipped = components.components.length - candidates.length;
+  let skippedWeightPct = round2(
+    components.components
+      .filter((c) => !isValidSymbol(c.symbol) || isExcludedByKeyword(c.name))
+      .reduce((sum, c) => sum + c.weightPct, 0),
+  );
 
   // batchParallel: 5건씩 병렬 호출. credit/short/loan 각각 fetchStockMetrics 내부에서
   // Promise.all로 묶이므로 1 batch = 최대 15 outbound (15/s 레이트 가까이).
@@ -206,17 +218,29 @@ export async function getCreditRatio(
   for (const { item, result, error } of batchResults) {
     if (error || !result) {
       skipped += 1;
+      skippedWeightPct += item.weightPct;
       continue;
     }
     componentMetrics.push({ ...result, weightPct: item.weightPct });
   }
 
   const aggregate = aggregateEtf(componentMetrics);
+  const analyzedWeightPct = round2(componentMetrics.reduce((sum, m) => sum + m.weightPct, 0));
   return {
     symbol,
     resolvedAs: "etf",
     stock: stockMetrics,
-    etf: { ...aggregate, componentsAnalyzed: componentMetrics.length, componentsSkipped: skipped },
+    etf: {
+      ...aggregate,
+      componentsAnalyzed: componentMetrics.length,
+      componentsSkipped: skipped,
+      analyzedWeightPct,
+      skippedWeightPct: round2(skippedWeightPct),
+      returnedWeightPct: components.returnedWeightPct,
+      expectedComponentCount: components.meta?.expectedComponentCount,
+      returnedComponentCount: components.returnedCount,
+      dataIssueCount: skipped,
+    },
     notes: [
       `상위 ${componentLimit}개 구성종목의 신용 잔고율/공여율을 ETF 구성비중으로 가중평균 (한투 공식 산식 기준).`,
       "단일 ETF 자체의 신용잔고는 통상 0이므로 구성종목 집계로 대체했습니다.",
@@ -229,9 +253,8 @@ async function fetchStockMetrics(
   symbol: string,
   lookbackDays: number,
 ): Promise<CreditRatioStock | undefined> {
-  const today = new Date();
-  const start = new Date(today);
-  start.setUTCDate(start.getUTCDate() - lookbackDays - 5);
+  const today = currentBusinessYmdKst();
+  const start = subtractBusinessDaysYmd(today, lookbackDays + 5);
 
   const [priceRes, creditRes, shortRes, loanRes] = await Promise.all([
     client
@@ -252,7 +275,7 @@ async function fetchStockMetrics(
           fid_cond_mrkt_div_code: "J",
           fid_cond_scr_div_code: "20476",
           fid_input_iscd: symbol,
-          fid_input_date_1: ymd(today),
+          fid_input_date_1: today,
         },
       })
       .catch(() => null),
@@ -263,8 +286,8 @@ async function fetchStockMetrics(
         query: {
           fid_cond_mrkt_div_code: "J",
           fid_input_iscd: symbol,
-          fid_input_date_1: ymd(start),
-          fid_input_date_2: ymd(today),
+          fid_input_date_1: start,
+          fid_input_date_2: today,
         },
       })
       .catch(() => null),
@@ -277,8 +300,8 @@ async function fetchStockMetrics(
         query: {
           mrkt_div_cls_code: "3",
           mksc_shrn_iscd: symbol,
-          start_date: ymd(start),
-          end_date: ymd(today),
+          start_date: start,
+          end_date: today,
           cts: "",
         },
       })
@@ -372,9 +395,9 @@ function mapLending(items: KisLoanTransItem[]): LoanLendingMetrics {
   };
 }
 
-function aggregateEtf(metrics: Array<CreditRatioStock & { weightPct: number }>): Omit<
+function aggregateEtf(metrics: Array<CreditRatioStock & { weightPct: number }>): Pick<
   CreditRatioEtfAggregate,
-  "componentsAnalyzed" | "componentsSkipped"
+  "weightedAvg" | "topByCreditBalanceRatio" | "topByShortValueRatio"
 > {
   const wAvg = (vals: Array<number | undefined>) => {
     let num = 0;

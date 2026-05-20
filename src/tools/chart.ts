@@ -26,6 +26,15 @@ import type {
 import { downsample, parseNum } from "../utils/downsample.js";
 import { extractArray, extractArrayWithObjectFallback } from "../utils/kisResponse.js";
 import { normalizeSymbol } from "../utils/symbol.js";
+import {
+  businessDaysBetweenInclusive,
+  currentBusinessYmdKst,
+  normalizeBusinessRange,
+  parseYmd,
+  previousBusinessDayYmd,
+  shiftBusinessMonthsYmd,
+  shiftBusinessYearsYmd,
+} from "../utils/businessDay.js";
 
 export type PeriodCode = "day" | "week" | "month" | "year" | "minute";
 
@@ -87,48 +96,27 @@ const MAX_MINUTE_RANGE_DAYS = 5;
 const MAX_POINTS_CAP = 2000;
 const DEFAULT_MAX_POINTS = 500;
 
-function formatYmd(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const m = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
-function parseYmd(s: string): Date {
-  if (!/^\d{8}$/.test(s)) throw new Error(`날짜 형식은 YYYYMMDD여야 합니다: ${s}`);
-  const y = Number(s.slice(0, 4));
-  const m = Number(s.slice(4, 6)) - 1;
-  const d = Number(s.slice(6, 8));
-  return new Date(Date.UTC(y, m, d));
-}
-
-function dateRangeDays(startYmd: string, endYmd: string): number {
-  const s = parseYmd(startYmd).getTime();
-  const e = parseYmd(endYmd).getTime();
-  return Math.round((e - s) / 86_400_000) + 1;
-}
-
 function defaultRange(period: PeriodCode): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = new Date(today);
+  const endDate = currentBusinessYmdKst();
+  let startDate = endDate;
   switch (period) {
     case "minute":
       // 분봉 기본 범위: 오늘 하루
       break;
     case "day":
-      start.setUTCMonth(start.getUTCMonth() - 6);
+      startDate = shiftBusinessMonthsYmd(endDate, -6);
       break;
     case "week":
-      start.setUTCFullYear(start.getUTCFullYear() - 2);
+      startDate = shiftBusinessYearsYmd(endDate, -2);
       break;
     case "month":
-      start.setUTCFullYear(start.getUTCFullYear() - 5);
+      startDate = shiftBusinessYearsYmd(endDate, -5);
       break;
     case "year":
-      start.setUTCFullYear(start.getUTCFullYear() - 20);
+      startDate = shiftBusinessYearsYmd(endDate, -20);
       break;
   }
-  return { startDate: formatYmd(start), endDate: formatYmd(today) };
+  return { startDate, endDate };
 }
 
 export async function getChart(client: KisClient, input: GetChartInput): Promise<ChartResult> {
@@ -140,7 +128,7 @@ export async function getChart(client: KisClient, input: GetChartInput): Promise
   }
 
   const range = input.startDate && input.endDate
-    ? { startDate: input.startDate, endDate: input.endDate }
+    ? normalizeBusinessRange(input.startDate, input.endDate)
     : defaultRange(input.period);
 
   const cap = Math.min(input.maxPoints ?? DEFAULT_MAX_POINTS, MAX_POINTS_CAP);
@@ -204,9 +192,8 @@ async function fetchDailyChart(
     // 한 페이지가 100건 미만이면 더 이상 데이터 없음
     if (items.length < 100) break;
 
-    // 다음 페이지: cursor를 가장 오래된 날짜의 1일 전으로
-    const nextCursor = new Date(parseYmd(newOldestYmd).getTime() - 86_400_000);
-    const nextCursorYmd = formatYmd(nextCursor);
+    // 다음 페이지: cursor를 가장 오래된 영업일의 직전 영업일로
+    const nextCursorYmd = previousBusinessDayYmd(newOldestYmd, false);
     if (nextCursorYmd >= cursor) break; // safety: cursor가 진전 없으면 중단
     cursor = nextCursorYmd;
   }
@@ -250,7 +237,7 @@ async function fetchMinuteChart(
     );
   }
 
-  const days = dateRangeDays(range.startDate, range.endDate);
+  const days = businessDaysBetweenInclusive(range.startDate, range.endDate);
   if (days < 1 || days > MAX_MINUTE_RANGE_DAYS) {
     throw new Error(
       `분봉은 최대 ${MAX_MINUTE_RANGE_DAYS} 영업일까지만 조회 가능합니다 (요청 범위: ${days}일). ` +
@@ -396,8 +383,7 @@ function stepBackOneMinute(ymd: string, hms: string): { ymd: string; hms: string
   let totalMin = hh * 60 + mm - 1;
   if (totalMin < 0) {
     // 전날 정규장 마감으로 점프
-    const prev = new Date(parseYmd(ymd).getTime() - 86_400_000);
-    return { ymd: formatYmd(prev), hms: "153000" };
+    return { ymd: previousBusinessDayYmd(ymd, false), hms: "153000" };
   }
   const newHh = Math.floor(totalMin / 60);
   const newMm = totalMin % 60;

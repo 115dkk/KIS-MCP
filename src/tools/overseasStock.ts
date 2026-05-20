@@ -28,6 +28,15 @@ import type {
 import { aggregateMinutes, type ChartPoint, type IntervalMinutes } from "./chart.js";
 import { downsample, parseNum } from "../utils/downsample.js";
 import { extractArrayPreferred, extractObject } from "../utils/kisResponse.js";
+import {
+  businessDaysBetweenInclusive,
+  currentBusinessYmdKst,
+  normalizeBusinessRange,
+  parseYmd,
+  previousBusinessDayYmd,
+  shiftBusinessMonthsYmd,
+  shiftBusinessYearsYmd,
+} from "../utils/businessDay.js";
 
 export type OverseasMarket =
   | "NAS"
@@ -88,42 +97,24 @@ export interface OverseasStockChartResult {
   notes?: string[];
 }
 
-function formatYmd(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const m = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
-function parseYmd(s: string): Date {
-  if (!/^\d{8}$/.test(s)) throw new Error(`날짜 형식은 YYYYMMDD여야 합니다: ${s}`);
-  return new Date(
-    Date.UTC(Number(s.slice(0, 4)), Number(s.slice(4, 6)) - 1, Number(s.slice(6, 8))),
-  );
-}
-
-function dateRangeDays(startYmd: string, endYmd: string): number {
-  return Math.round((parseYmd(endYmd).getTime() - parseYmd(startYmd).getTime()) / 86_400_000) + 1;
-}
-
 function defaultRange(period: OverseasPeriod): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = new Date(today);
+  const endDate = currentBusinessYmdKst();
+  let startDate = endDate;
   switch (period) {
     case "minute":
       // 분봉은 당일만
       break;
     case "day":
-      start.setUTCMonth(start.getUTCMonth() - 6);
+      startDate = shiftBusinessMonthsYmd(endDate, -6);
       break;
     case "week":
-      start.setUTCFullYear(start.getUTCFullYear() - 2);
+      startDate = shiftBusinessYearsYmd(endDate, -2);
       break;
     case "month":
-      start.setUTCFullYear(start.getUTCFullYear() - 5);
+      startDate = shiftBusinessYearsYmd(endDate, -5);
       break;
   }
-  return { startDate: formatYmd(start), endDate: formatYmd(today) };
+  return { startDate, endDate };
 }
 
 function gubnFor(period: OverseasPeriod): string {
@@ -153,7 +144,7 @@ export async function getOverseasStockChart(
   const symbol = input.symbol.trim().toUpperCase();
   const period = input.period;
   const range = input.startDate && input.endDate
-    ? { startDate: input.startDate, endDate: input.endDate }
+    ? normalizeBusinessRange(input.startDate, input.endDate)
     : defaultRange(period);
   const cap = Math.min(input.maxPoints ?? DEFAULT_MAX_POINTS, MAX_POINTS_CAP);
 
@@ -164,7 +155,7 @@ export async function getOverseasStockChart(
         `intervalMinutes는 ${VALID_INTERVALS.join("/")} 중 하나여야 합니다: ${interval}`,
       );
     }
-    const days = dateRangeDays(range.startDate, range.endDate);
+    const days = businessDaysBetweenInclusive(range.startDate, range.endDate);
     if (days < 1 || days > MAX_MINUTE_RANGE_DAYS) {
       throw new Error(
         `분봉은 최대 ${MAX_MINUTE_RANGE_DAYS} 영업일까지만 조회 가능합니다 (요청: ${days}일). period=day로 조회하세요.`,
@@ -236,9 +227,8 @@ async function fetchDailyChart(
     if (parseYmd(oldestYmd).getTime() <= startDateMs) break;
     if (items.length < 100) break; // 더 데이터 없음 (KIS는 100건/호출 가능)
 
-    // 다음 페이지: bymd를 oldestYmd - 1일로
-    const next = new Date(parseYmd(oldestYmd).getTime() - 86_400_000);
-    const nextBymd = formatYmd(next);
+    // 다음 페이지: bymd를 oldestYmd 직전 영업일로
+    const nextBymd = previousBusinessDayYmd(oldestYmd, false);
     if (nextBymd >= bymd) break;
     bymd = nextBymd;
     keyb = ""; // BYMD 갱신 방식이 KEYB보다 단순하고 안전 (KEYB는 next 비공식)
@@ -385,8 +375,7 @@ function stepBackOneMinute(ymd: string, hms: string): { ymd: string; hms: string
   const ss = Number(hms.slice(4, 6));
   let totalMin = hh * 60 + mm - 1;
   if (totalMin < 0) {
-    const prev = new Date(parseYmd(ymd).getTime() - 86_400_000);
-    return { ymd: formatYmd(prev), hms: "235900" };
+    return { ymd: previousBusinessDayYmd(ymd, false), hms: "235900" };
   }
   const newHh = Math.floor(totalMin / 60);
   const newMm = totalMin % 60;

@@ -21,8 +21,11 @@ import { getQuote } from "../tools/quote.js";
 import { getReturn } from "../tools/return.js";
 import { getChart } from "../tools/chart.js";
 import { getEtfComponents } from "../tools/etf.js";
+import { getEtfNavTrend } from "../tools/etfNav.js";
 import { getFundamentals } from "../tools/fundamentals.js";
 import { getCreditRatio } from "../tools/credit.js";
+import { getCreditRank } from "../tools/creditRank.js";
+import { getTradingStatus } from "../tools/status.js";
 import { getDividend } from "../tools/dividend.js";
 import { advancedSearch } from "../tools/search.js";
 import { ping } from "../tools/ping.js";
@@ -158,6 +161,23 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
   );
 
   server.tool(
+    "get_trading_status",
+    [
+      "종목의 거래상태/주의 플래그를 조회합니다.",
+      "투자주의, 거래정지, 공매도 과열, 관리종목, VI 등 KIS inquire-price 응답의 상태 필드를 읽기 전용으로 정리합니다.",
+      "주문/잔고/계좌 API는 사용하지 않습니다.",
+    ].join(" "),
+    { symbol: SYMBOL_SCHEMA.describe("종목코드 (예: 005930, 069500)") },
+    async (args) => {
+      try {
+        return jsonContent(await getTradingStatus(client, args));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.tool(
     "get_return",
     [
       "지정 기간(1D/1W/1M/3M/6M/1Y/3Y/5Y/YTD)의 절대 수익률(%) 단일 수치.",
@@ -261,6 +281,42 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
   );
 
   server.tool(
+    "get_etf_nav_trend",
+    [
+      "ETF/ETN의 가격 대비 NAV, 괴리율(discountPct) 추세를 조회합니다.",
+      "mode=snapshot은 현재 가격/NAV, daily는 날짜별 NAV 비교, minute는 당일 분별 NAV 비교입니다.",
+      "daily 날짜 범위는 영업일 기준으로 보정됩니다.",
+    ].join(" "),
+    {
+      symbol: SYMBOL_SCHEMA.describe("ETF/ETN 종목코드 (예: 069500)"),
+      mode: z.enum(["snapshot", "daily", "minute"]).optional().describe("기본 snapshot"),
+      startDate: z.string().regex(/^\d{8}$/).optional().describe("YYYYMMDD. daily 모드에서 사용"),
+      endDate: z.string().regex(/^\d{8}$/).optional().describe("YYYYMMDD. daily 모드에서 사용"),
+      intervalMinutes: z
+        .union([
+          z.literal(1),
+          z.literal(3),
+          z.literal(5),
+          z.literal(10),
+          z.literal(15),
+          z.literal(30),
+          z.literal(60),
+          z.literal(120),
+        ])
+        .optional()
+        .describe("minute 모드의 간격. 기본 1"),
+      maxPoints: z.number().int().min(1).max(500).optional().describe("최대 반환 포인트 수. 기본/상한 500"),
+    },
+    async (args) => {
+      try {
+        return jsonContent(await getEtfNavTrend(client, args));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.tool(
     "get_fundamentals",
     [
       "PER/PBR/EPS/BPS, 시가총액(억원), 상장주식수, 융자잔고비율(%), 거래량회전율(%) 조회.",
@@ -347,6 +403,44 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
   );
 
   // ─── Market index / fx / commodity tools ───
+
+  server.tool(
+    "get_credit_rank",
+    [
+      "신용잔고 또는 공매도 상위 종목 랭킹을 조회합니다.",
+      "kind=credit_balance는 신용잔고율/잔고수량/잔고금액/증감률 기준, kind=short_sale은 공매도 거래비중 기준입니다.",
+      "ETF형/파생형 이름은 기본 제외합니다.",
+    ].join(" "),
+    {
+      kind: z.enum(["credit_balance", "short_sale"]).optional().describe("기본 credit_balance"),
+      market: z
+        .enum(["all", "kospi", "kosdaq", "kospi200", "kosdaq150"])
+        .optional()
+        .describe("조회 시장. 기본 all"),
+      limit: z.number().int().min(1).max(100).optional().describe("반환 개수. 기본 20, 상한 100"),
+      sortBy: z
+        .enum([
+          "credit_balance_ratio",
+          "credit_balance_shares",
+          "credit_balance_amount",
+          "credit_balance_ratio_increase",
+          "credit_balance_ratio_decrease",
+          "short_sale_value_ratio",
+          "short_sale_volume_ratio",
+        ])
+        .optional()
+        .describe("랭킹 정렬 기준"),
+      lookbackDays: z.number().int().min(1).max(90).optional().describe("비교 기간. 기본 1"),
+      excludeEtfLike: z.boolean().optional().describe("인버스/레버리지 등 ETF형 이름 제외 여부. 기본 true"),
+    },
+    async (args) => {
+      try {
+        return jsonContent(await getCreditRank(client, args));
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
 
   server.tool(
     "get_index",

@@ -77,8 +77,8 @@ export interface AdvancedSearchInput {
 export interface AdvancedSearchHit {
   symbol: string;
   name: string;
-  price: number;
-  changeRate: number;
+  price?: number;
+  changeRate?: number;
   volume?: number;
   marketCap?: number;
   rankFromKis?: number;
@@ -237,8 +237,8 @@ export async function advancedSearch(
         : item,
     );
     enriched.sort((a, b) => {
-      const av = a.enrichedReturnPct ?? a.changeRate;
-      const bv = b.enrichedReturnPct ?? b.changeRate;
+      const av = a.enrichedReturnPct ?? a.changeRate ?? 0;
+      const bv = b.enrichedReturnPct ?? b.changeRate ?? 0;
       return order === "asc" ? av - bv : bv - av;
     });
     trimmed = enriched.slice(0, limit);
@@ -414,10 +414,10 @@ async function advancedSearchViaMaster(
   // 분류 매핑
   const types: SymbolType[] =
     instrumentType === "etf"
-      ? ["EF", "EN"]
-      : instrumentType === "stock"
+      ? ["EF", "EN", "BC"]
+    : instrumentType === "stock"
       ? ["ST"]
-      : ["ST", "EF", "EN"];
+      : ["ST", "EF", "EN", "BC"];
 
   const markets: SymbolMarket[] = ["KOSPI", "KOSDAQ"];
   const pool: SymbolRecord[] = listByFilter({ types, markets });
@@ -456,8 +456,6 @@ async function advancedSearchViaMaster(
   let hits: AdvancedSearchHit[] = filtered.map((rec, i) => ({
     symbol: rec.code,
     name: rec.name,
-    price: NaN,
-    changeRate: NaN,
     rankFromKis: i + 1,
   }));
 

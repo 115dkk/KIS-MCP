@@ -193,6 +193,39 @@ describe("KisClient — 인증 + 재시도 + 캐싱", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3); // token + 2 data
   });
 
+  it("M0-9 + M4: ETF 구성종목 count 필드가 없으면 0개로 오해해 캐시하지 않음", async () => {
+    const path = "/uapi/etfetn/v1/quotations/inquire-component-stock-price";
+    fetchSpy
+      .mockResolvedValueOnce(tokenResponse("tok-1"))
+      .mockResolvedValueOnce(
+        okEnvelope({
+          output1: { nav: "10000" },
+          output2: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        okEnvelope({
+          output1: { nav: "10000" },
+          output2: [{ stck_shrn_iscd: "005930" }],
+        }),
+      );
+    const client = makeClient(kv);
+    const res1 = await client.get({
+      path,
+      trId: "FHKST121600C0",
+      query: { fid_input_iscd: "069500" },
+    });
+    expect(res1.output2).toEqual([]);
+
+    const res2 = await client.get({
+      path,
+      trId: "FHKST121600C0",
+      query: { fid_input_iscd: "069500" },
+    });
+    expect(res2.output2).toEqual([{ stck_shrn_iscd: "005930" }]);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
   it("M0-9 + M4: ETF 구성종목이 진짜 0개인 메타 응답은 캐싱 가능", async () => {
     const path = "/uapi/etfetn/v1/quotations/inquire-component-stock-price";
     fetchSpy
