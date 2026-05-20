@@ -119,6 +119,8 @@ const SYMBOL_SCHEMA = z
   .transform((s) => s.trim().toUpperCase())
   .pipe(z.string().regex(SYMBOL_REGEX, "1~12자 영숫자 종목코드 (예: 005930, Q500001)"));
 
+const JSON_OBJECT_OUTPUT_SCHEMA = z.object({}).passthrough();
+
 function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): void {
   server.tool(
     "ping",
@@ -817,6 +819,18 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
       }
     },
   );
+
+  applyDefaultOutputSchemas(server);
+}
+
+function applyDefaultOutputSchemas(server: McpServer): void {
+  const registeredTools = (server as unknown as {
+    _registeredTools?: Record<string, { outputSchema?: typeof JSON_OBJECT_OUTPUT_SCHEMA }>;
+  })._registeredTools;
+  if (!registeredTools) return;
+  for (const tool of Object.values(registeredTools)) {
+    tool.outputSchema ??= JSON_OBJECT_OUTPUT_SCHEMA;
+  }
 }
 
 function registerPrompts(server: McpServer): void {
@@ -1137,9 +1151,15 @@ function registerPrompts(server: McpServer): void {
 }
 
 function jsonContent(data: unknown) {
+  const structuredContent = isJsonObject(data) ? data : { value: data };
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+    structuredContent,
+    content: [{ type: "text" as const, text: JSON.stringify(structuredContent, null, 2) }],
   };
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function errorContent(err: unknown) {
