@@ -6,10 +6,10 @@
 
 | 파일 | 카테고리 | API 수 |
 |---|---|---|
-| [_other.md](./_other.md) | (기타) | 5 |
+| [_other.md](./_other.md) | (기타) | 4 |
 | [domestic-bond.md](./domestic-bond.md) | [장내채권] | 18 |
 | [domestic-futureoption.md](./domestic-futureoption.md) | [국내선물옵션] | 44 |
-| [domestic-stock.md](./domestic-stock.md) | [국내주식] | 186 |
+| [domestic-stock.md](./domestic-stock.md) | [국내주식] | 187 |
 | [overseas-futureoption.md](./overseas-futureoption.md) | [해외선물옵션] | 35 |
 | [overseas-stock.md](./overseas-stock.md) | [해외주식] | 51 |
 | **TOTAL** | | **339** |
@@ -30,7 +30,6 @@
 | TR_ID | API 이름 | 카테고리 | URL |
 |---|---|---|---|
 | `—` | [API 목록](./_other.md#api-목록) | (기타) | `—` |
-| `—` | [Hashkey](./_other.md#hashkey) | (기타) | `/uapi/hashkey` |
 | `—` | [실시간 (웹소켓) 접속키 발급](./_other.md#실시간-(웹소켓)-접속키-발급) | (기타) | `/oauth2/Approval` |
 | `—` | [접근토큰폐기(P)](./_other.md#접근토큰폐기(p)) | (기타) | `/oauth2/revokeP` |
 | `—` | [접근토큰발급(P)](./_other.md#접근토큰발급(p)) | (기타) | `/oauth2/tokenP` |
@@ -178,6 +177,7 @@
 | `FHPST02340000` | [국내주식 시간외등락율순위](./domestic-stock.md#국내주식-시간외등락율순위) | [국내주식] | `/uapi/domestic-stock/v1/ranking/overtime-fluctuation` |
 | `FHPST02350000` | [국내주식 시간외거래량순위](./domestic-stock.md#국내주식-시간외거래량순위) | [국내주식] | `/uapi/domestic-stock/v1/ranking/overtime-volume` |
 | `FHPST02400000` | [ETF_ETN 현재가](./domestic-stock.md#etf_etn-현재가) | [국내주식] | `/uapi/etfetn/v1/quotations/inquire-price` |
+| `FHPST02400200` | [ETF 현재가 호가](./domestic-stock.md#etf-현재가-호가) | [국내주식] | `/uapi/etfetn/v1/quotations/inquire-asking-price` |
 | `FHPST02440000` | [NAV 비교추이(종목)](./domestic-stock.md#nav-비교추이(종목)) | [국내주식] | `/uapi/etfetn/v1/quotations/nav-comparison-trend` |
 | `FHPST02440100` | [NAV 비교추이(분)](./domestic-stock.md#nav-비교추이(분)) | [국내주식] | `/uapi/etfetn/v1/quotations/nav-comparison-time-trend` |
 | `FHPST02440200` | [NAV 비교추이(일)](./domestic-stock.md#nav-비교추이(일)) | [국내주식] | `/uapi/etfetn/v1/quotations/nav-comparison-daily-trend` |
@@ -373,19 +373,32 @@
 
 | 도구 | TR_ID | 시트명 |
 |---|---|---|
-| `get_quote` (주식) | `FHKST01010100` | 주식현재가 시세 |
-| `get_quote` (ETF/ETN) | `FHPST02400000` | ETF/ETN 현재가 |
-| `get_chart` | `FHKST03010100` | 국내주식기간별시세(일/주/월/년) |
+| `get_quote` / `get_fundamentals` / `get_trading_status` | `FHKST01010100` | 주식현재가 시세 |
+| `get_chart` / `get_return` | `FHKST03010100` | 국내주식기간별시세(일_주_월_년) |
+| `get_chart` (분봉) | `FHKST03010230` | 주식일별분봉조회 |
+| `get_quote` (ETF/ETN) | `FHPST02400000` | ETF_ETN 현재가 |
 | `get_etf_components` | `FHKST121600C0` | ETF 구성종목시세 |
+| `get_etf_nav_trend` (snapshot) | `FHPST02440000` | NAV 비교추이(종목) |
+| `get_etf_nav_trend` (일) | `FHPST02440200` | NAV 비교추이(일) |
+| `get_etf_nav_trend` (분) | `FHPST02440100` | NAV 비교추이(분) |
 | `get_dividend` | `HHKDB669102C0` | 예탁원정보(배당일정) |
-| `get_credit_ratio` | `FHPST04760000` | 종목별 일별 신용잔고 |
-| `get_credit_ratio` (공매도) | `FHPST04830000` | 종목별 일별 공매도 |
+| `get_credit_ratio` | `FHPST04760000` | 국내주식 신용잔고 일별추이 |
+| `get_credit_ratio` (공매도) | `FHPST04830000` | 국내주식 공매도 일별추이 |
 | `get_credit_ratio` (대차) | `HHPST074500C0` | 종목별 일별 대차거래추이 |
+| `get_credit_rank` (신용) | `FHKST17010000` | 국내주식 신용잔고 상위 |
+| `get_credit_rank` (공매도) | `FHPST04820000` | 국내주식 공매도 상위종목 |
 | `advanced_search` (등락률) | `FHPST01700000` | 국내주식 등락률 순위 |
-| `advanced_search` (시총) | `FHPST01740000` | 국내주식 시가총액 순위 |
-| `advanced_search` (거래량) | `FHPST01710000` | 거래량 순위 |
+| `advanced_search` (시총) | `FHPST01740000` | 국내주식 시가총액 상위 |
+| `advanced_search` (거래량) | `FHPST01710000` | 거래량순위 |
 | `get_index` (국내) | `FHPUP02100000` | 국내업종 현재지수 |
-| `get_index_chart` (국내) | `FHPUP02120000` | 국내업종 일자별지수 |
-| `get_index`/`get_fx` (해외) | `FHKST03030100` | 해외주식 종목/지수/환율 기간별시세 |
-| `get_commodity` | `HHDFC55010000` | 해외선물종목현재가 |
-| `get_commodity_chart` | `HHDFC55020100` | 해외선물 체결추이(일간) |
+| `get_index_chart` (국내 일/주/월) | `FHPUP02120000` | 국내업종 일자별지수 |
+| `get_index_chart` (국내 분봉) | `FHPUP02110200` | 국내업종 시간별지수(분) |
+| `get_index`/`get_fx`/`get_commodity` (해외 chartprice) | `FHKST03030100` | 해외주식 종목_지수_환율기간별시세(일_주_월_년) |
+| `get_index_chart` (해외 분봉) | `FHKST03030200` | 해외지수분봉조회 |
+| `get_overseas_stock_quote` | `HHDFS76220000` | 해외주식 복수종목 시세조회 |
+| `get_overseas_stock_info` | `CTPF1702R` | 해외주식 상품기본정보 |
+| `get_overseas_stock_chart` / `get_return` (해외) | `HHDFS76240000` | 해외주식 기간별시세 |
+| `get_overseas_stock_chart` (분봉) | `HHDFS76950200` | 해외주식분봉조회 |
+| `get_commodity` (해외선물) | `HHDFC55010000` | 해외선물종목현재가 |
+| `get_commodity_chart` (해외선물 일봉) | `HHDFC55020100` | 해외선물 체결추이(일간) |
+| `get_commodity_chart` (해외선물 분봉) | `HHDFC55020400` | 해외선물 분봉조회 |

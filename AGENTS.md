@@ -220,12 +220,12 @@ ROADMAP M0 리팩토링 결과 확립된 원칙. 신규 도구 작성 시 반드
 ### 6.2. 공식 API 문서
 - **LLM 친화 변환본 (사용 권장):** `docs/kis-api/`
   - `INDEX.md` — 339개 전체 API의 TR_ID·URL·카테고리·파일 위치 색인 + 본 MCP 사용 매핑
-  - `domestic-stock.md` (186개) / `overseas-stock.md` (51개) / `domestic-futureoption.md` (44개) /
-    `overseas-futureoption.md` (35개) / `domestic-bond.md` (18개) / `_other.md` (5개)
+  - `domestic-stock.md` (187개) / `overseas-stock.md` (51개) / `domestic-futureoption.md` (44개) /
+    `overseas-futureoption.md` (35개) / `domestic-bond.md` (18개) / `_other.md` (4개)
   - 각 API: 메타 표(Sheet/Menu/Method/URL/TR_ID) + Request/Response 필드 표 + Request/Response Example
   - 공통 OAuth 헤더(`authorization`/`appkey`/`appsecret` 등)는 INDEX.md에만 한 번 나오고 각 API에서 생략됨
   - **검색 패턴**: TR_ID 찾기 → `grep "FHKST01010100" docs/kis-api/`, 카테고리 전체 보기 → 카테고리 파일 직접 read
-- **원본 (소스):** `한국투자증권_오픈API_전체문서_20260418_030007.xlsx`
+- **원본 (소스):** `한국투자증권_오픈API_전체문서_20260603_030000.xlsx`
   - 사람이 직접 더블클릭으로 열 때만 사용. LLM은 cp949 + 셀 단위 구조라 직접 읽기 어려움
 - **변환 스크립트:** `scripts/build-api-docs.py` (엑셀 갱신 시 재실행)
 - 핵심 참조 시트 (본 MCP 9+6개 도구가 사용):

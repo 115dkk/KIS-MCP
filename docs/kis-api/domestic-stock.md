@@ -1,6 +1,6 @@
 # [국내주식] API
 
-한국투자증권 OpenAPI — `[국내주식]` 카테고리 (186개).
+한국투자증권 OpenAPI — `[국내주식]` 카테고리 (187개).
 원본 시트는 cp949 엑셀이며 본 파일은 LLM 친화 변환본. 검색은 `INDEX.md` 권장.
 
 공통 OAuth 헤더(`authorization`, `appkey`, `appsecret`, `tr_id`, `custtype` 등)는 모든 API 동일하므로 본 문서에서 생략. `INDEX.md` 상단 참고.
@@ -2356,7 +2356,133 @@ fid_cond_mrkt_div_code:J  fid_input_iscd:005930
 ```
 
 ---
-### 34. 주식일별분봉조회
+### 34. ETF 현재가 호가
+
+| Field | Value |
+|---|---|
+| Sheet | `ETF 현재가 호가` |
+| Menu | [국내주식] 기본시세 |
+| Method | `GET` |
+| URL | `/uapi/etfetn/v1/quotations/inquire-asking-price` |
+| TR_ID (실전) | `FHPST02400200` |
+
+#### Request Query Parameter
+
+| Element | 한글명 | Type | Req | Len | Description |
+|---|---|---|---|---|---|
+| `FID_COND_MRKT_DIV_CODE` | 조건 시장 분류 코드 | string | Y | 2 | J |
+| `FID_INPUT_ISCD` | 입력 종목코드 | string | Y | 12 | 종목번호 (6자리) |
+
+#### Response Body
+
+| Element | 한글명 | Type | Req | Len | Description |
+|---|---|---|---|---|---|
+| `rt_cd` | 성공 실패 여부 | string | Y | 1 |  |
+| `msg_cd` | 응답코드 | string | Y | 8 |  |
+| `msg1` | 응답메세지 | string | Y | 80 |  |
+| `output` | 응답상세 | object | Y |  |  |
+| `aspr_acpt_hour` | 호가 접수 시간 | string | Y | 10 |  |
+| `askp1` | 매도호가1 | string | Y | 10 |  |
+| `askp2` | 매도호가2 | string | Y | 10 |  |
+| `askp3` | 매도호가3 | string | Y | 10 |  |
+| `askp4` | 매도호가4 | string | Y | 10 |  |
+| `askp5` | 매도호가5 | string | Y | 10 |  |
+| `askp6` | 매도호가6 | string | Y | 10 |  |
+| `askp7` | 매도호가7 | string | Y | 10 |  |
+| `askp8` | 매도호가8 | string | Y | 10 |  |
+| `askp9` | 매도호가9 | string | Y | 10 |  |
+| `askp10` | 매도호가10 | string | Y | 10 |  |
+| `bidp1` | 매수호가1 | string | Y | 10 |  |
+| `bidp2` | 매수호가2 | string | Y | 10 |  |
+| `bidp3` | 매수호가3 | string | Y | 10 |  |
+| `bidp4` | 매수호가4 | string | Y | 10 |  |
+| `bidp5` | 매수호가5 | string | Y | 10 |  |
+| `bidp6` | 매수호가6 | string | Y | 10 |  |
+| `bidp7` | 매수호가7 | string | Y | 10 |  |
+| `bidp8` | 매수호가8 | string | Y | 10 |  |
+| `bidp9` | 매수호가9 | string | Y | 10 |  |
+| `bidp10` | 매수호가10 | string | Y | 12 |  |
+| `askp_rsqn1` | 매도호가 잔량1 | string | Y | 12 |  |
+| `askp_rsqn2` | 매도호가 잔량2 | string | Y | 12 |  |
+| `askp_rsqn3` | 매도호가 잔량3 | string | Y | 12 |  |
+| `askp_rsqn4` | 매도호가 잔량4 | string | Y | 12 |  |
+| `askp_rsqn5` | 매도호가 잔량5 | string | Y | 12 |  |
+| `askp_rsqn6` | 매도호가 잔량6 | string | Y | 12 |  |
+| `askp_rsqn7` | 매도호가 잔량7 | string | Y | 12 |  |
+| `askp_rsqn8` | 매도호가 잔량8 | string | Y | 12 |  |
+| `askp_rsqn9` | 매도호가 잔량9 | string | Y | 12 |  |
+| `askp_rsqn10` | 매도호가 잔량10 | string | Y | 12 |  |
+| `bidp_rsqn1` | 매수호가 잔량1 | string | Y | 12 |  |
+| `bidp_rsqn2` | 매수호가 잔량2 | string | Y | 12 |  |
+| `bidp_rsqn3` | 매수호가 잔량3 | string | Y | 12 |  |
+| `bidp_rsqn4` | 매수호가 잔량4 | string | Y | 12 |  |
+| `bidp_rsqn5` | 매수호가 잔량5 | string | Y | 12 |  |
+| `bidp_rsqn6` | 매수호가 잔량6 | string | Y | 12 |  |
+| `bidp_rsqn7` | 매수호가 잔량7 | string | Y | 12 |  |
+| `bidp_rsqn8` | 매수호가 잔량8 | string | Y | 12 |  |
+| `bidp_rsqn9` | 매수호가 잔량9 | string | Y | 12 |  |
+| `bidp_rsqn10` | 매수호가 잔량10 | string | Y | 10 |  |
+| `askp_rsqn_icdc1` | 매도호가 잔량 증감1 | string | Y | 10 |  |
+| `askp_rsqn_icdc2` | 매도호가 잔량 증감2 | string | Y | 10 |  |
+| `askp_rsqn_icdc3` | 매도호가 잔량 증감3 | string | Y | 10 |  |
+| `askp_rsqn_icdc4` | 매도호가 잔량 증감4 | string | Y | 10 |  |
+| `askp_rsqn_icdc5` | 매도호가 잔량 증감5 | string | Y | 10 |  |
+| `askp_rsqn_icdc6` | 매도호가 잔량 증감6 | string | Y | 10 |  |
+| `askp_rsqn_icdc7` | 매도호가 잔량 증감7 | string | Y | 10 |  |
+| `askp_rsqn_icdc8` | 매도호가 잔량 증감8 | string | Y | 10 |  |
+| `askp_rsqn_icdc9` | 매도호가 잔량 증감9 | string | Y | 10 |  |
+| `askp_rsqn_icdc10` | 매도호가 잔량 증감10 | string | Y | 10 |  |
+| `bidp_rsqn_icdc1` | 매수호가 잔량 증감1 | string | Y | 10 |  |
+| `bidp_rsqn_icdc2` | 매수호가 잔량 증감2 | string | Y | 10 |  |
+| `bidp_rsqn_icdc3` | 매수호가 잔량 증감3 | string | Y | 10 |  |
+| `bidp_rsqn_icdc4` | 매수호가 잔량 증감4 | string | Y | 10 |  |
+| `bidp_rsqn_icdc5` | 매수호가 잔량 증감5 | string | Y | 10 |  |
+| `bidp_rsqn_icdc6` | 매수호가 잔량 증감6 | string | Y | 10 |  |
+| `bidp_rsqn_icdc7` | 매수호가 잔량 증감7 | string | Y | 10 |  |
+| `bidp_rsqn_icdc8` | 매수호가 잔량 증감8 | string | Y | 10 |  |
+| `bidp_rsqn_icdc9` | 매수호가 잔량 증감9 | string | Y | 10 |  |
+| `bidp_rsqn_icdc10` | 매수호가 잔량 증감10 | string | Y | 12 |  |
+| `total_askp_rsqn` | 총 매도호가 잔량 | string | Y | 12 |  |
+| `total_bidp_rsqn` | 총 매수호가 잔량 | string | Y | 10 |  |
+| `total_askp_rsqn_icdc` | 총 매도호가 잔량 증감 | string | Y | 10 |  |
+| `total_bidp_rsqn_icdc` | 총 매수호가 잔량 증감 | string | Y | 10 |  |
+| `ovtm_total_askp_icdc` | 시간외 총 매도호가 증감 | string | Y | 10 |  |
+| `ovtm_total_bidp_icdc` | 시간외 총 매수호가 증감 | string | Y | 12 |  |
+| `ovtm_total_askp_rsqn` | 시간외 총 매도호가 잔량 | string | Y | 12 |  |
+| `ovtm_total_bidp_rsqn` | 시간외 총 매수호가 잔량 | string | Y | 12 |  |
+| `ntby_aspr_rsqn` | 순매수 호가 잔량 | string | Y | 2 |  |
+| `new_mkop_cls_code` | 신 장운영 구분 코드 | string | Y | 12 |  |
+| `lp_askp_rsqn1` | LP 매도호가 잔량1 | string | Y | 12 |  |
+| `lp_askp_rsqn2` | LP 매도호가 잔량2 | string | Y | 12 |  |
+| `lp_askp_rsqn3` | LP 매도호가 잔량3 | string | Y | 12 |  |
+| `lp_askp_rsqn4` | LP 매도호가 잔량4 | string | Y | 12 |  |
+| `lp_askp_rsqn5` | LP 매도호가 잔량5 | string | Y | 12 |  |
+| `lp_askp_rsqn6` | LP 매도호가 잔량6 | string | Y | 12 |  |
+| `lp_askp_rsqn7` | LP 매도호가 잔량7 | string | Y | 12 |  |
+| `lp_askp_rsqn8` | LP 매도호가 잔량8 | string | Y | 12 |  |
+| `lp_askp_rsqn9` | LP 매도호가 잔량9 | string | Y | 12 |  |
+| `lp_askp_rsqn10` | LP 매도호가 잔량10 | string | Y | 12 |  |
+| `lp_bidp_rsqn1` | LP 매수호가 잔량1 | string | Y | 12 |  |
+| `lp_bidp_rsqn2` | LP 매수호가 잔량2 | string | Y | 12 |  |
+| `lp_bidp_rsqn3` | LP 매수호가 잔량3 | string | Y | 12 |  |
+| `lp_bidp_rsqn4` | LP 매수호가 잔량4 | string | Y | 12 |  |
+| `lp_bidp_rsqn5` | LP 매수호가 잔량5 | string | Y | 12 |  |
+| `lp_bidp_rsqn6` | LP 매수호가 잔량6 | string | Y | 12 |  |
+| `lp_bidp_rsqn7` | LP 매수호가 잔량7 | string | Y | 12 |  |
+| `lp_bidp_rsqn8` | LP 매수호가 잔량8 | string | Y | 12 |  |
+| `lp_bidp_rsqn9` | LP 매수호가 잔량9 | string | Y | 12 |  |
+| `lp_bidp_rsqn10` | LP 매수호가 잔량10 | string | Y | 12 |  |
+| `lp_total_askp_rsqn` | LP 총 매도호가 잔량 | string | Y | 12 |  |
+| `lp_total_bidp_rsqn` | LP 총 매수호가 잔량 | string | Y | 10 |  |
+| `mid_prc` | KRX 중간가 | string | Y | 12 |  |
+| `midp_total_rsqn` | KRX 중간가잔량합계수량 | string | Y | 1 |  |
+| `midp_cls_code` | KRX 중간가구분코드 | string | Y | 10 |  |
+| `mid_prc2` | NXT 중간가 | string | Y | 12 | 미사용 필드 |
+| `midp_total_rsqn2` | NXT 중간가잔량합계수량 | string | Y | 1 | 미사용 필드 |
+| `midp_cls_code2` | NXT 중간가구분코드 | string | Y | 40 | 미사용 필드 |
+
+---
+### 35. 주식일별분봉조회
 
 | Field | Value |
 |---|---|
@@ -2415,7 +2541,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 35. 국내주식기간별시세(일_주_월_년)
+### 36. 국내주식기간별시세(일_주_월_년)
 
 | Field | Value |
 |---|---|
@@ -2500,7 +2626,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 36. NAV 비교추이(일)
+### 37. NAV 비교추이(일)
 
 | Field | Value |
 |---|---|
@@ -2553,7 +2679,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 37. 주식현재가 호가_예상체결
+### 38. 주식현재가 호가_예상체결
 
 | Field | Value |
 |---|---|
@@ -2675,7 +2801,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 38. 주식현재가 체결
+### 39. 주식현재가 체결
 
 | Field | Value |
 |---|---|
@@ -2719,7 +2845,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 39. 주식현재가 회원사
+### 40. 주식현재가 회원사
 
 | Field | Value |
 |---|---|
@@ -2823,7 +2949,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 40. NAV 비교추이(분)
+### 41. NAV 비교추이(분)
 
 | Field | Value |
 |---|---|
@@ -2875,7 +3001,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 41. 주식현재가 투자자
+### 42. 주식현재가 투자자
 
 | Field | Value |
 |---|---|
@@ -2934,7 +3060,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 42. ETF_ETN 현재가
+### 43. ETF_ETN 현재가
 
 | Field | Value |
 |---|---|
@@ -3031,7 +3157,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20241108  FID_
 ```
 
 ---
-### 43. 국내주식 장마감 예상체결가
+### 44. 국내주식 장마감 예상체결가
 
 | Field | Value |
 |---|---|
@@ -3081,7 +3207,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:11173  fid_input_iscd:0001  fid_
 ```
 
 ---
-### 44. 주식당일분봉조회
+### 45. 주식당일분봉조회
 
 | Field | Value |
 |---|---|
@@ -3138,7 +3264,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:11173  fid_input_iscd:0001  fid_
 ```
 
 ---
-### 45. ELW 현재가 시세
+### 46. ELW 현재가 시세
 
 | Field | Value |
 |---|---|
@@ -3213,7 +3339,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:11173  fid_input_iscd:0001  fid_
 ```
 
 ---
-### 46. ELW 신규상장종목
+### 47. ELW 신규상장종목
 
 | Field | Value |
 |---|---|
@@ -3265,7 +3391,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:11548  FID_DIV_CLS_CODE:02  FID_
 ```
 
 ---
-### 47. ELW 투자지표추이(일별)
+### 48. ELW 투자지표추이(일별)
 
 | Field | Value |
 |---|---|
@@ -3318,7 +3444,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281
 ```
 
 ---
-### 48. ELW 민감도 순위
+### 49. ELW 민감도 순위
 
 | Field | Value |
 |---|---|
@@ -3382,7 +3508,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:20285  FID_UNAS_INPUT_ISCD:00000
 ```
 
 ---
-### 49. ELW 기초자산별 종목시세
+### 50. ELW 기초자산별 종목시세
 
 | Field | Value |
 |---|---|
@@ -3463,7 +3589,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:11541  FID_MRKT_CLS_CODE:A  FID_
 ```
 
 ---
-### 50. ELW 종목검색
+### 51. ELW 종목검색
 
 | Field | Value |
 |---|---|
@@ -3599,7 +3725,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:11510  FID_RANK_SORT_CLS_CODE:0 
 ```
 
 ---
-### 51. ELW 변동성 추이(분별)
+### 52. ELW 변동성 추이(분별)
 
 | Field | Value |
 |---|---|
@@ -3647,7 +3773,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57JS61  FID_HOUR_CLS_CODE:60  FID_PW_DA
 ```
 
 ---
-### 52. ELW 변동성추이(체결)
+### 53. ELW 변동성추이(체결)
 
 | Field | Value |
 |---|---|
@@ -3694,7 +3820,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:58J540
 ```
 
 ---
-### 53. ELW 당일급변종목
+### 54. ELW 당일급변종목
 
 | Field | Value |
 |---|---|
@@ -3758,7 +3884,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:20287  FID_UNAS_INPUT_ISCD:00000
 ```
 
 ---
-### 54. ELW 투자지표추이(분별)
+### 55. ELW 투자지표추이(분별)
 
 | Field | Value |
 |---|---|
@@ -3811,7 +3937,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281  FID_HOUR_CLS_CODE:60  FID_PW_DA
 ```
 
 ---
-### 55. ELW 기초자산 목록조회
+### 56. ELW 기초자산 목록조회
 
 | Field | Value |
 |---|---|
@@ -3856,7 +3982,7 @@ FID_COND_SCR_DIV_CODE:11541  FID_RANK_SORT_CLS_CODE:0  FID_INPUT_ISCD:00000
 ```
 
 ---
-### 56. ELW 변동성 추이(일별)
+### 57. ELW 변동성 추이(일별)
 
 | Field | Value |
 |---|---|
@@ -3909,7 +4035,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57JS61
 ```
 
 ---
-### 57. ELW 거래량순위
+### 58. ELW 거래량순위
 
 | Field | Value |
 |---|---|
@@ -4002,7 +4128,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:20278  FID_UNAS_INPUT_ISCD:00000
 ```
 
 ---
-### 58. ELW 지표순위
+### 59. ELW 지표순위
 
 | Field | Value |
 |---|---|
@@ -4062,7 +4188,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:20279  FID_UNAS_INPUT_ISCD:00000
 ```
 
 ---
-### 59. ELW 투자지표추이(체결)
+### 60. ELW 투자지표추이(체결)
 
 | Field | Value |
 |---|---|
@@ -4112,7 +4238,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281
 ```
 
 ---
-### 60. ELW 상승률순위
+### 61. ELW 상승률순위
 
 | Field | Value |
 |---|---|
@@ -4197,7 +4323,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:20277  FID_UNAS_INPUT_ISCD:00000
 ```
 
 ---
-### 61. ELW 민감도 추이(일별)
+### 62. ELW 민감도 추이(일별)
 
 | Field | Value |
 |---|---|
@@ -4246,7 +4372,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281
 ```
 
 ---
-### 62. ELW 비교대상종목조회
+### 63. ELW 비교대상종목조회
 
 | Field | Value |
 |---|---|
@@ -4286,7 +4412,7 @@ FID_COND_SCR_DIV_CODE:11517  FID_INPUT_ISCD:005930
 ```
 
 ---
-### 63. ELW 만기예정_만기종목
+### 64. ELW 만기예정_만기종목
 
 | Field | Value |
 |---|---|
@@ -4353,7 +4479,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_COND_SCR_DIV_CODE:11547  FID_INPUT_DATE_1:20240611
 ```
 
 ---
-### 64. ELW LP매매추이
+### 65. ELW LP매매추이
 
 | Field | Value |
 |---|---|
@@ -4420,7 +4546,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281
 ```
 
 ---
-### 65. ELW 민감도 추이(체결)
+### 66. ELW 민감도 추이(체결)
 
 | Field | Value |
 |---|---|
@@ -4459,7 +4585,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281
 | `rho` | 로우 | string | Y | 84 |  |
 
 ---
-### 66. ELW 변동성 추이(틱)
+### 67. ELW 변동성 추이(틱)
 
 | Field | Value |
 |---|---|
@@ -4501,7 +4627,7 @@ FID_COND_MRKT_DIV_CODE:W  FID_INPUT_ISCD:57K281
 ```
 
 ---
-### 67. 국내주식 예상체결지수 추이
+### 68. 국내주식 예상체결지수 추이
 
 | Field | Value |
 |---|---|
@@ -4548,7 +4674,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:0001  fid_input_hour_1:  fid_mkop_cls_c
 ```
 
 ---
-### 68. 국내주식업종기간별시세(일_주_월_년)
+### 69. 국내주식업종기간별시세(일_주_월_년)
 
 | Field | Value |
 |---|---|
@@ -4612,7 +4738,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:0001  fid_input_hour_1:  fid_mkop_cls_c
 ```
 
 ---
-### 69. 국내업종 시간별지수(분)
+### 70. 국내업종 시간별지수(분)
 
 | Field | Value |
 |---|---|
@@ -4659,7 +4785,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 70. 국내업종 구분별전체시세
+### 71. 국내업종 구분별전체시세
 
 | Field | Value |
 |---|---|
@@ -4731,7 +4857,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 71. 업종 분봉조회
+### 72. 업종 분봉조회
 
 | Field | Value |
 |---|---|
@@ -4797,7 +4923,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 72. 국내휴장일조회
+### 73. 국내휴장일조회
 
 | Field | Value |
 |---|---|
@@ -4842,7 +4968,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 73. 국내주식 예상체결 전체지수
+### 74. 국내주식 예상체결 전체지수
 
 | Field | Value |
 |---|---|
@@ -4903,7 +5029,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 74. 국내업종 현재지수
+### 75. 국내업종 현재지수
 
 | Field | Value |
 |---|---|
@@ -4977,7 +5103,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 75. 국내선물 영업일조회
+### 76. 국내선물 영업일조회
 
 | Field | Value |
 |---|---|
@@ -5017,7 +5143,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001  fid_input_hour_1:120
 ```
 
 ---
-### 76. 국내업종 시간별지수(초)
+### 77. 국내업종 시간별지수(초)
 
 | Field | Value |
 |---|---|
@@ -5063,7 +5189,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001
 ```
 
 ---
-### 77. 국내업종 일자별지수
+### 78. 국내업종 일자별지수
 
 | Field | Value |
 |---|---|
@@ -5137,7 +5263,7 @@ fid_cond_mrkt_div_code:U  fid_input_iscd:1001
 ```
 
 ---
-### 78. 금리 종합(국내채권_금리)
+### 79. 금리 종합(국내채권_금리)
 
 | Field | Value |
 |---|---|
@@ -5192,7 +5318,7 @@ FID_COND_MRKT_DIV_CODE:I  FID_COND_SCR_DIV_CODE:20702  FID_DIV_CLS_CODE:1  FID_D
 ```
 
 ---
-### 79. 변동성완화장치(VI) 현황
+### 80. 변동성완화장치(VI) 현황
 
 | Field | Value |
 |---|---|
@@ -5249,7 +5375,7 @@ FID_COND_MRKT_DIV_CODE:I  FID_COND_SCR_DIV_CODE:20702  FID_DIV_CLS_CODE:1  FID_D
 ```
 
 ---
-### 80. 종합 시황_공시(제목)
+### 81. 종합 시황_공시(제목)
 
 | Field | Value |
 |---|---|
@@ -5305,7 +5431,7 @@ FID_NEWS_OFER_ENTP_CODE:  FID_COND_MRKT_CLS_CODE:  FID_INPUT_ISCD:  FID_TITL_CNT
 ```
 
 ---
-### 81. 상품기본조회
+### 82. 상품기본조회
 
 | Field | Value |
 |---|---|
@@ -5363,7 +5489,7 @@ FID_NEWS_OFER_ENTP_CODE:  FID_COND_MRKT_CLS_CODE:  FID_INPUT_ISCD:  FID_TITL_CNT
 ```
 
 ---
-### 82. 예탁원정보(상장정보일정)
+### 83. 예탁원정보(상장정보일정)
 
 | Field | Value |
 |---|---|
@@ -5411,7 +5537,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 83. 예탁원정보(공모주청약일정)
+### 84. 예탁원정보(공모주청약일정)
 
 | Field | Value |
 |---|---|
@@ -5464,7 +5590,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 84. 국내주식 재무비율
+### 85. 국내주식 재무비율
 
 | Field | Value |
 |---|---|
@@ -5513,7 +5639,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 85. 예탁원정보(자본감소일정)
+### 86. 예탁원정보(자본감소일정)
 
 | Field | Value |
 |---|---|
@@ -5562,7 +5688,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 86. 예탁원정보(무상증자일정)
+### 87. 예탁원정보(무상증자일정)
 
 | Field | Value |
 |---|---|
@@ -5613,7 +5739,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 87. 국내주식 증권사별 투자의견
+### 88. 국내주식 증권사별 투자의견
 
 | Field | Value |
 |---|---|
@@ -5671,7 +5797,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:16633  FID_INPUT_ISCD:999  FID_D
 ```
 
 ---
-### 88. 국내주식 당사 신용가능종목
+### 89. 국내주식 당사 신용가능종목
 
 | Field | Value |
 |---|---|
@@ -5715,7 +5841,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:16633  FID_INPUT_ISCD:999  FID_D
 ```
 
 ---
-### 89. 예탁원정보(주식매수청구일정)
+### 90. 예탁원정보(주식매수청구일정)
 
 | Field | Value |
 |---|---|
@@ -5764,7 +5890,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 90. 예탁원정보(액면교체일정)
+### 91. 예탁원정보(액면교체일정)
 
 | Field | Value |
 |---|---|
@@ -5812,7 +5938,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:  market_gb:1
 ```
 
 ---
-### 91. 예탁원정보(배당일정)
+### 92. 예탁원정보(배당일정)
 
 | Field | Value |
 |---|---|
@@ -5867,7 +5993,7 @@ cts:  gb1:0  f_dt:20230301  t_dt:20240326  sht_cd:  high_gb:0
 ```
 
 ---
-### 92. 국내주식 종목투자의견
+### 93. 국내주식 종목투자의견
 
 | Field | Value |
 |---|---|
@@ -5920,7 +6046,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:16633  FID_INPUT_ISCD:005930  FI
 ```
 
 ---
-### 93. 국내주식 안정성비율
+### 94. 국내주식 안정성비율
 
 | Field | Value |
 |---|---|
@@ -5964,7 +6090,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:16633  FID_INPUT_ISCD:005930  FI
 ```
 
 ---
-### 94. 국내주식 수익성비율
+### 95. 국내주식 수익성비율
 
 | Field | Value |
 |---|---|
@@ -6008,7 +6134,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:16633  FID_INPUT_ISCD:005930  FI
 ```
 
 ---
-### 95. 예탁원정보(실권주일정)
+### 96. 예탁원정보(실권주일정)
 
 | Field | Value |
 |---|---|
@@ -6057,7 +6183,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 96. 예탁원정보(의무예치일정)
+### 97. 예탁원정보(의무예치일정)
 
 | Field | Value |
 |---|---|
@@ -6103,7 +6229,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 97. 국내주식 손익계산서
+### 98. 국내주식 손익계산서
 
 | Field | Value |
 |---|---|
@@ -6155,7 +6281,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 98. 당사 대주가능 종목
+### 99. 당사 대주가능 종목
 
 | Field | Value |
 |---|---|
@@ -6214,7 +6340,7 @@ EXCG_DVSN_CD:00  PDNO:  THCO_STLN_PSBL_YN:Y  INQR_DVSN_1:0  CTX_AREA_FK200:  CTX
 ```
 
 ---
-### 99. 주식기본조회
+### 100. 주식기본조회
 
 | Field | Value |
 |---|---|
@@ -6294,7 +6420,7 @@ EXCG_DVSN_CD:00  PDNO:  THCO_STLN_PSBL_YN:Y  INQR_DVSN_1:0  CTX_AREA_FK200:  CTX
 | `idx_bztp_lcls_cd_name` | 지수업종대분류코드명 | string | Y | 60 | 표준산업대분류코드  00	해당사항없음                                                              01	농업, 임업 및 어업                                                        02	광업                                                                      03	제조업                                                                    04	전기, 가스, 증기 및 수도사업                                              05	하수-폐기물 처리, 원료재생 및환경복원업                                   06	건설업                                                                    07	도매 및 소매업                                                            08	운수업                                                                    09	숙박 및 음식점업                                                          10	출판, 영상, 방송통신 및 정보서비스업                                      11	금융 및 보험업                                                            12	부동산업 및 임대업                                                        13	전문, 과학 및 기술 서비스업                                               14	사업시설관리 및 사업지원서비스업                                          15	공공행정, 국방 및 사회보장 행정                                           16	교육 서비스업                                                             17	보건업 및 사회복지 서비스업                                               18	예술, 스포츠 및 여가관련 서비스업                                         19	협회 및 단체, 수리 및 기타 개인 서비스업                                  20	가구내 고용활동 및 달리 분류되지 않은 자가소비생산활동                    21	국제 및 외국기관 |
 | `idx_bztp_mcls_cd_name` | 지수업종중분류코드명 | string | Y | 60 | 표준산업중분류코드                                                     0000	해당사항없음                                                              0101	농업                                                                      0102	임업                                                                      0103	어업                                                                      0205	석탄, 원유 및 천연가스 광업                                               0206	금속 광업                                                                 0207	비금속광물 광업; 연료용 제외                                              0208	광업 지원 서비스업                                                        0310	식료품 제조업                                                             0311	음료 제조업                                                               0312	담배 제조업                                                               0313	섬유제품 제조업; 의복제외                                                 0314	의복, 의복액세서리 및 모피제품제조업                                      0315	가죽, 가방 및 신발 제조업                                                 0316	목재 및 나무제품 제조업;가구제외                                          0317	펄프, 종이 및 종이제품 제조업                                             0318	인쇄 및 기록매체 복제업                                                   0319	코크스, 연탄 및 석유정제품 제조업                                         0320	화학물질 및 화학제품 제조업;의약품 제외                                   0321	의료용 물질 및 의약품 제조업                                              0322	고무제품 및 플라스틱제품 제조업                                           0323	비금속 광물제품 제조업                                                    0324	1차 금속 제조업                                                           0325	금속가공제품 제조업;기계 및가구 제외                                      0326	전자부품, 컴퓨터, 영상, 음향 및 통신장비 제조업                           0327	의료, 정밀, 광학기기 및 시계 제조업                                       0328	전기장비 제조업                                                           0329	기타 기계 및 장비 제조업                                                  0330	자동차 및 트레일러 제조업                                                 0331	기타 운송장비 제조업                                                      0332	가구 제조업                                                               0333	기타 제품 제조업                                                          0435	전기, 가스, 증기 및 공기조절 공급업                                       0436	수도사업                                                                  0537	하수, 폐수 및 분뇨 처리업                                                 0538	폐기물 수집운반, 처리 및 원료재생업                                       0539	환경 정화 및 복원업                                                       0641	종합 건설업                                                               0642	전문직별 공사업                                                           0745	자동차 및 부품 판매업                                                     0746	도매 및 상품중개업                                                        0747	소매업; 자동차 제외                                                       0849	육상운송 및 파이프라인 운송업                                             0850	수상 운송업                                                               0851	항공 운송업                                                               0852	창고 및 운송관련 서비스업                                                 0955	숙박업                                                                    0956	음식점 및 주점업                                                          1058	출판업                                                                    1059	영상·오디오 기록물 제작 및 배급업                                        1060	방송업                                                                    1061	통신업                                                                    1062	컴퓨터 프로그래밍, 시스템 통합및 관리업                                   1063	정보서비스업                                                              1164	금융업                                                                    1165	보험 및 연금업                                                            1166	금융 및 보험 관련 서비스업                                                1268	부동산업                                                                  1269	임대업;부동산 제외                                                        1370	연구개발업                                                                1371	전문서비스업                                                              1372	건축기술, 엔지니어링 및 기타과학기술 서비스업                             1373	기타 전문, 과학 및 기술 서비스업                                          1474	사업시설 관리 및 조경 서비스업                                            1475	사업지원 서비스업                                                         1584	공공행정, 국방 및 사회보장 행정                                           1685	교육 서비스업                                                             1786	보건업                                                                    1787	사회복지 서비스업                                                         1890	창작, 예술 및 여가관련 서비스업                                           1891	스포츠 및 오락관련 서비스업                                               1994	협회 및 단체                                                              1995	수리업                                                                    1996	기타 개인 서비스업                                                        2097	가구내 고용활동                                                           2098	달리 분류되지 않은 자가소비를 위한가구의 재화 및 서비스 생산활동          2199	국제 및 외국기관 |
 | `idx_bztp_scls_cd_name` | 지수업종소분류코드명 | string | Y | 60 | 표준산업소분류코드 참조 |
-| `ocr_no` | OCR번호 | string | Y | 4 |  |
+| `ocr_no` | OCR번호 | string | Y | 5 |  |
 | `crfd_item_yn` | 크라우드펀딩종목여부 | string | Y | 1 |  |
 | `elec_scty_yn` | 전자증권여부 | string | Y | 1 |  |
 | `issu_istt_cd` | 발행기관코드 | string | Y | 5 |  |
@@ -6319,7 +6445,7 @@ EXCG_DVSN_CD:00  PDNO:  THCO_STLN_PSBL_YN:Y  INQR_DVSN_1:0  CTX_AREA_FK200:  CTX
 ```
 
 ---
-### 100. 예탁원정보(유상증자일정)
+### 101. 예탁원정보(유상증자일정)
 
 | Field | Value |
 |---|---|
@@ -6373,7 +6499,7 @@ cts:  gb1:1  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 101. 예탁원정보(주주총회일정)
+### 102. 예탁원정보(주주총회일정)
 
 | Field | Value |
 |---|---|
@@ -6420,7 +6546,7 @@ cts:  f_dt:20230101  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 102. 국내주식 성장성비율
+### 103. 국내주식 성장성비율
 
 | Field | Value |
 |---|---|
@@ -6464,7 +6590,7 @@ cts:  f_dt:20230101  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 103. 국내주식 대차대조표
+### 104. 국내주식 대차대조표
 
 | Field | Value |
 |---|---|
@@ -6514,7 +6640,7 @@ cts:  f_dt:20230101  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 104. 예탁원정보(합병_분할일정)
+### 105. 예탁원정보(합병_분할일정)
 
 | Field | Value |
 |---|---|
@@ -6568,7 +6694,7 @@ cts:  f_dt:20230301  t_dt:20240326  sht_cd:
 ```
 
 ---
-### 105. 국내주식 종목추정실적
+### 106. 국내주식 종목추정실적
 
 | Field | Value |
 |---|---|
@@ -6627,7 +6753,7 @@ SHT_CD:005930
 ```
 
 ---
-### 106. 국내주식 기타주요비율
+### 107. 국내주식 기타주요비율
 
 | Field | Value |
 |---|---|
@@ -6671,7 +6797,7 @@ SHT_CD:005930
 ```
 
 ---
-### 107. 프로그램매매 종합현황(시간)
+### 108. 프로그램매매 종합현황(시간)
 
 | Field | Value |
 |---|---|
@@ -6731,7 +6857,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_MRKT_CLS_CODE:Q  FID_SCTN_CLS_CODE:1  FID_INPUT_IS
 ```
 
 ---
-### 108. 국내주식 신용잔고 일별추이
+### 109. 국내주식 신용잔고 일별추이
 
 | Field | Value |
 |---|---|
@@ -6797,7 +6923,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_MRKT_CLS_CODE:Q  FID_SCTN_CLS_CODE:1  FID_INPUT_IS
 ```
 
 ---
-### 109. 시장별 투자자매매동향(일별)
+### 110. 시장별 투자자매매동향(일별)
 
 | Field | Value |
 |---|---|
@@ -6878,7 +7004,7 @@ FID_COND_MRKT_DIV_CODE:U  FID_INPUT_ISCD:0001  FID_INPUT_DATE_1:20240517  FID_IN
 ```
 
 ---
-### 110. 국내주식 공매도 일별추이
+### 111. 국내주식 공매도 일별추이
 
 | Field | Value |
 |---|---|
@@ -6936,7 +7062,7 @@ FID_COND_MRKT_DIV_CODE:U  FID_INPUT_ISCD:0001  FID_INPUT_DATE_1:20240517  FID_IN
 | `avrg_prc` | 평균가격 | string | Y | 11 |  |
 
 ---
-### 111. 종목별 투자자매매동향(일별)
+### 112. 종목별 투자자매매동향(일별)
 
 | Field | Value |
 |---|---|
@@ -7086,7 +7212,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20250811  FID_
 ```
 
 ---
-### 112. 종목조건검색 목록조회
+### 113. 종목조건검색 목록조회
 
 | Field | Value |
 |---|---|
@@ -7127,7 +7253,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20250811  FID_
 ```
 
 ---
-### 113. 국내주식 상하한가 포착
+### 114. 국내주식 상하한가 포착
 
 | Field | Value |
 |---|---|
@@ -7190,7 +7316,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:11300  FID_PRC_CLS_CODE:0  FID_D
 ```
 
 ---
-### 114. 프로그램매매 종합현황(일별)
+### 115. 프로그램매매 종합현황(일별)
 
 | Field | Value |
 |---|---|
@@ -7330,7 +7456,7 @@ FID_COND_MRKT_DIV_CODE:UN  FID_MRKT_CLS_CODE:K  FID_INPUT_DATE_1:  FID_INPUT_DAT
 ```
 
 ---
-### 115. 종목별 일별 대차거래추이
+### 116. 종목별 일별 대차거래추이
 
 | Field | Value |
 |---|---|
@@ -7382,7 +7508,7 @@ mrkt_div_cls_code:1  mksc_shrn_iscd:005930  start_date:20240401  end_date:202404
 ```
 
 ---
-### 116. 종목조건검색조회
+### 117. 종목조건검색조회
 
 | Field | Value |
 |---|---|
@@ -7444,7 +7570,7 @@ mrkt_div_cls_code:1  mksc_shrn_iscd:005930  start_date:20240401  end_date:202404
 ```
 
 ---
-### 117. 국내주식 매물대_거래비중
+### 118. 국내주식 매물대_거래비중
 
 | Field | Value |
 |---|---|
@@ -7500,7 +7626,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:136480  FID_COND_SCR_DIV_CODE:20113  FI
 ```
 
 ---
-### 118. 국내기관_외국인 매매종목가집계
+### 119. 국내기관_외국인 매매종목가집계
 
 | Field | Value |
 |---|---|
@@ -7558,7 +7684,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:136480  FID_COND_SCR_DIV_CODE:20113  FI
 | `etc_corp_ntby_tr_pbmn` | 기타 법인 순매수 거래 대금 | string | Y | 18 |  |
 
 ---
-### 119. 관심종목 그룹별 종목조회
+### 120. 관심종목 그룹별 종목조회
 
 | Field | Value |
 |---|---|
@@ -7615,7 +7741,7 @@ TYPE:1  USER_ID:{{HTS_ID}}  DATA_RANK:  INTER_GRP_CODE:002  INTER_GRP_NAME:  HTS
 ```
 
 ---
-### 120. 주식현재가 회원사 종목매매동향
+### 121. 주식현재가 회원사 종목매매동향
 
 | Field | Value |
 |---|---|
@@ -7666,7 +7792,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:136480  FID_INPUT_ISCD_2:00003  FID_INP
 ```
 
 ---
-### 121. 종목별 프로그램매매추이(일별)
+### 122. 종목별 프로그램매매추이(일별)
 
 | Field | Value |
 |---|---|
@@ -7720,7 +7846,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_INPUT_ISCD:005930  FID_INPUT_DATE_1:20240517
 ```
 
 ---
-### 122. 관심종목 그룹조회
+### 123. 관심종목 그룹조회
 
 | Field | Value |
 |---|---|
@@ -7765,7 +7891,7 @@ TYPE:1  FID_ETC_CLS_CODE:00  USER_ID:{{HTS_ID}}
 ```
 
 ---
-### 123. 종목별 외인기관 추정가집계
+### 124. 종목별 외인기관 추정가집계
 
 | Field | Value |
 |---|---|
@@ -7806,7 +7932,7 @@ TYPE:1  FID_ETC_CLS_CODE:00  USER_ID:{{HTS_ID}}
 ```
 
 ---
-### 124. 종목별일별매수매도체결량
+### 125. 종목별일별매수매도체결량
 
 | Field | Value |
 |---|---|
@@ -7853,7 +7979,7 @@ TYPE:1  FID_ETC_CLS_CODE:00  USER_ID:{{HTS_ID}}
 ```
 
 ---
-### 125. 국내주식 체결금액별 매매비중
+### 126. 국내주식 체결금액별 매매비중
 
 | Field | Value |
 |---|---|
@@ -7903,7 +8029,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:11119  FID_INPUT_ISCD:005930
 ```
 
 ---
-### 126. 프로그램매매 투자자매매동향(당일)
+### 127. 프로그램매매 투자자매매동향(당일)
 
 | Field | Value |
 |---|---|
@@ -7961,7 +8087,7 @@ MRKT_DIV_CLS_CODE:1
 ```
 
 ---
-### 127. 국내 증시자금 종합
+### 128. 국내 증시자금 종합
 
 | Field | Value |
 |---|---|
@@ -8015,7 +8141,7 @@ FID_INPUT_DATE_1:20240503
 ```
 
 ---
-### 128. 국내주식 예상체결가 추이
+### 129. 국내주식 예상체결가 추이
 
 | Field | Value |
 |---|---|
@@ -8069,7 +8195,7 @@ FID_INPUT_DATE_1:20240503
 ```
 
 ---
-### 129. 회원사 실시간 매매동향(틱)
+### 130. 회원사 실시간 매매동향(틱)
 
 | Field | Value |
 |---|---|
@@ -8124,7 +8250,7 @@ FID_COND_SCR_DIV_CODE:20432  FID_INPUT_ISCD:005930  FID_INPUT_ISCD2:99999  FID_M
 ```
 
 ---
-### 130. 시장별 투자자매매동향(시세)
+### 131. 시장별 투자자매매동향(시세)
 
 | Field | Value |
 |---|---|
@@ -8234,7 +8360,7 @@ FID_COND_SCR_DIV_CODE:20432  FID_INPUT_ISCD:005930  FID_INPUT_ISCD2:99999  FID_M
 ```
 
 ---
-### 131. 종목별 프로그램매매추이(체결)
+### 132. 종목별 프로그램매매추이(체결)
 
 | Field | Value |
 |---|---|
@@ -8276,7 +8402,7 @@ FID_COND_SCR_DIV_CODE:20432  FID_INPUT_ISCD:005930  FID_INPUT_ISCD2:99999  FID_M
 | `whol_ntby_tr_pbmn_icdc` | 전체 순매수 거래 대금 증감 | string | Y | 10 |  |
 
 ---
-### 132. 외국계 매매종목 가집계
+### 133. 외국계 매매종목 가집계
 
 | Field | Value |
 |---|---|
@@ -8327,7 +8453,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:16441  FID_INPUT_ISCD:0000  FID_
 ```
 
 ---
-### 133. 국내주식 시간외예상체결등락률
+### 134. 국내주식 시간외예상체결등락률
 
 | Field | Value |
 |---|---|
@@ -8384,7 +8510,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:11186  FID_INPUT_ISCD:0000  FID_
 ```
 
 ---
-### 134. 종목별 외국계 순매수추이
+### 135. 종목별 외국계 순매수추이
 
 | Field | Value |
 |---|---|
@@ -8433,7 +8559,7 @@ FID_INPUT_ISCD:005930  FID_INPUT_ISCD_2:99999
 ```
 
 ---
-### 135. 관심종목(멀티종목) 시세조회
+### 136. 관심종목(멀티종목) 시세조회
 
 | Field | Value |
 |---|---|
@@ -8558,7 +8684,7 @@ FID_COND_MRKT_DIV_CODE_1:J  FID_INPUT_ISCD_1:005930  FID_COND_MRKT_DIV_CODE_2:J 
 ```
 
 ---
-### 136. 국내주식 예상체결 상승_하락상위
+### 137. 국내주식 예상체결 상승_하락상위
 
 | Field | Value |
 |---|---|
@@ -8619,7 +8745,7 @@ FID_COND_MRKT_DIV_CODE_1:J  FID_INPUT_ISCD_1:005930  FID_COND_MRKT_DIV_CODE_2:J 
 ```
 
 ---
-### 137. 국내주식 호가잔량 순위
+### 138. 국내주식 호가잔량 순위
 
 | Field | Value |
 |---|---|
@@ -8678,7 +8804,7 @@ FID_COND_MRKT_DIV_CODE_1:J  FID_INPUT_ISCD_1:005930  FID_COND_MRKT_DIV_CODE_2:J 
 ```
 
 ---
-### 138. 국내주식 신용잔고 상위
+### 139. 국내주식 신용잔고 상위
 
 | Field | Value |
 |---|---|
@@ -8739,7 +8865,7 @@ fid_cond_scr_div_code:11701  fid_input_iscd:0000  fid_option:2  fid_cond_mrkt_di
 ```
 
 ---
-### 139. 국내주식 시간외거래량순위
+### 140. 국내주식 시간외거래량순위
 
 | Field | Value |
 |---|---|
@@ -8803,7 +8929,7 @@ FID_COND_MRKT_DIV_CODE:J  FID_COND_SCR_DIV_CODE:20235  FID_INPUT_ISCD:0000  FID_
 ```
 
 ---
-### 140. 국내주식 배당률 상위
+### 141. 국내주식 배당률 상위
 
 | Field | Value |
 |---|---|
@@ -8854,7 +8980,7 @@ CTS_AREA:  GB1:0  UPJONG:0001  GB2:0  GB3:1  F_DT:20200101  T_DT:20240403  GB4:0
 ```
 
 ---
-### 141. 국내주식 시간외잔량 순위
+### 142. 국내주식 시간외잔량 순위
 
 | Field | Value |
 |---|---|
@@ -8911,7 +9037,7 @@ CTS_AREA:  GB1:0  UPJONG:0001  GB2:0  GB3:1  F_DT:20200101  T_DT:20240403  GB4:0
 ```
 
 ---
-### 142. 국내주식 공매도 상위종목
+### 143. 국내주식 공매도 상위종목
 
 | Field | Value |
 |---|---|
@@ -8972,7 +9098,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 143. 국내주식 이격도 순위
+### 144. 국내주식 이격도 순위
 
 | Field | Value |
 |---|---|
@@ -9032,7 +9158,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 144. HTS조회상위20종목
+### 145. HTS조회상위20종목
 
 | Field | Value |
 |---|---|
@@ -9065,7 +9191,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 145. 거래량순위
+### 146. 거래량순위
 
 | Field | Value |
 |---|---|
@@ -9090,7 +9216,6 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 | `FID_INPUT_PRICE_1` | 입력 가격1 | string | Y | 12 | 가격 ~  ex) "0"    전체 가격 대상 조회 시 FID_INPUT_PRICE_1, FID_INPUT_PRICE_2 모두 ""(공란) 입력 |
 | `FID_INPUT_PRICE_2` | 입력 가격2 | string | Y | 12 | ~ 가격  ex) "1000000"    전체 가격 대상 조회 시 FID_INPUT_PRICE_1, FID_INPUT_PRICE_2 모두 ""(공란) 입력 |
 | `FID_VOL_CNT` | 거래량 수 | string | Y | 12 | 거래량 ~  ex) "100000"    전체 거래량 대상 조회 시 FID_VOL_CNT ""(공란) 입력 |
-| `FID_INPUT_DATE_1` | 입력 날짜1 | string | Y | 10 | ""(공란) 입력 |
 
 #### Response Body
 
@@ -9131,7 +9256,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 146. 국내주식 수익자산지표 순위
+### 147. 국내주식 수익자산지표 순위
 
 | Field | Value |
 |---|---|
@@ -9198,7 +9323,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 147. 국내주식 신고_신저근접종목 상위
+### 148. 국내주식 신고_신저근접종목 상위
 
 | Field | Value |
 |---|---|
@@ -9262,7 +9387,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 148. 국내주식 우선주_괴리율 상위
+### 149. 국내주식 우선주_괴리율 상위
 
 | Field | Value |
 |---|---|
@@ -9324,7 +9449,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 149. 국내주식 대량체결건수 상위
+### 150. 국내주식 대량체결건수 상위
 
 | Field | Value |
 |---|---|
@@ -9383,7 +9508,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 150. 국내주식 재무비율 순위
+### 151. 국내주식 재무비율 순위
 
 | Field | Value |
 |---|---|
@@ -9459,7 +9584,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 151. 국내주식 시가총액 상위
+### 152. 국내주식 시가총액 상위
 
 | Field | Value |
 |---|---|
@@ -9515,7 +9640,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 152. 국내주식 당사매매종목 상위
+### 153. 국내주식 당사매매종목 상위
 
 | Field | Value |
 |---|---|
@@ -9575,7 +9700,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 153. 국내주식 등락률 순위
+### 154. 국내주식 등락률 순위
 
 | Field | Value |
 |---|---|
@@ -9649,7 +9774,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 154. 국내주식 시장가치 순위
+### 155. 국내주식 시장가치 순위
 
 | Field | Value |
 |---|---|
@@ -9718,7 +9843,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 155. 국내주식 관심종목등록 상위
+### 156. 국내주식 관심종목등록 상위
 
 | Field | Value |
 |---|---|
@@ -9778,7 +9903,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 156. 국내주식 체결강도 상위
+### 157. 국내주식 체결강도 상위
 
 | Field | Value |
 |---|---|
@@ -9834,7 +9959,7 @@ fid_cond_mrkt_div_code:J  fid_cond_scr_div_code:20482  fid_input_iscd:0000  fid_
 ```
 
 ---
-### 157. 국내주식 시간외등락율순위
+### 158. 국내주식 시간외등락율순위
 
 | Field | Value |
 |---|---|
@@ -9908,7 +10033,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 158. 국내지수 실시간예상체결
+### 159. 국내지수 실시간예상체결
 
 | Field | Value |
 |---|---|
@@ -9979,7 +10104,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 159. 국내주식 장운영정보 (통합)
+### 160. 국내주식 장운영정보 (통합)
 
 | Field | Value |
 |---|---|
@@ -10020,7 +10145,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `EXCH_CLS_CODE` | 거래소 구분코드 | string | Y | 1 |  |
 
 ---
-### 160. 국내주식 실시간회원사 (NXT)
+### 161. 국내주식 실시간회원사 (NXT)
 
 | Field | Value |
 |---|---|
@@ -10129,7 +10254,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `BYOV_MBCR_ENG_NAME5` | 매수 영문회원사명5 | string | Y | 20 |  |
 
 ---
-### 161. 국내주식 실시간체결통보
+### 162. 국내주식 실시간체결통보
 
 | Field | Value |
 |---|---|
@@ -10196,7 +10321,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 162. 국내주식 시간외 실시간예상체결 (KRX)
+### 163. 국내주식 시간외 실시간예상체결 (KRX)
 
 | Field | Value |
 |---|---|
@@ -10280,7 +10405,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 163. 국내주식 시간외 실시간호가 (KRX)
+### 164. 국내주식 시간외 실시간호가 (KRX)
 
 | Field | Value |
 |---|---|
@@ -10375,7 +10500,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 164. 국내주식 실시간프로그램매매 (통합)
+### 165. 국내주식 실시간프로그램매매 (통합)
 
 | Field | Value |
 |---|---|
@@ -10417,7 +10542,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `WHOL_NTBY_QTY` | 전체순매수호가잔량 | string | Y | 8 |  |
 
 ---
-### 165. 국내주식 실시간호가 (통합)
+### 166. 국내주식 실시간호가 (통합)
 
 | Field | Value |
 |---|---|
@@ -10513,7 +10638,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `NMID_CLS_CODE` | NXT 중간가 매수매도 구분 | string | Y | 1 |  |
 
 ---
-### 166. 국내주식 실시간프로그램매매 (KRX)
+### 167. 국내주식 실시간프로그램매매 (KRX)
 
 | Field | Value |
 |---|---|
@@ -10565,7 +10690,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 167. 국내주식 장운영정보 (KRX)
+### 168. 국내주식 장운영정보 (KRX)
 
 | Field | Value |
 |---|---|
@@ -10617,7 +10742,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 168. 국내주식 실시간체결가 (KRX)
+### 169. 국내주식 실시간체결가 (KRX)
 
 | Field | Value |
 |---|---|
@@ -10703,7 +10828,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 169. 국내지수 실시간프로그램매매
+### 170. 국내지수 실시간프로그램매매
 
 | Field | Value |
 |---|---|
@@ -10832,7 +10957,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 170. 국내주식 실시간회원사 (통합)
+### 171. 국내주식 실시간회원사 (통합)
 
 | Field | Value |
 |---|---|
@@ -10941,7 +11066,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `BYOV_MBCR_ENG_NAME5` | 매수 영문회원사명5 | string | Y | 20 |  |
 
 ---
-### 171. 국내지수 실시간체결
+### 172. 국내지수 실시간체결
 
 | Field | Value |
 |---|---|
@@ -11012,7 +11137,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 172. 국내주식 실시간예상체결 (KRX)
+### 173. 국내주식 실시간예상체결 (KRX)
 
 | Field | Value |
 |---|---|
@@ -11098,7 +11223,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 173. ELW 실시간호가
+### 174. ELW 실시간호가
 
 | Field | Value |
 |---|---|
@@ -11212,7 +11337,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 174. 국내주식 실시간호가 (KRX)
+### 175. 국내주식 실시간호가 (KRX)
 
 | Field | Value |
 |---|---|
@@ -11311,7 +11436,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 175. 국내주식 실시간체결가 (통합)
+### 176. 국내주식 실시간체결가 (통합)
 
 | Field | Value |
 |---|---|
@@ -11388,7 +11513,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `VI_STND_PRC` | 정적VI발동기준가 | string | Y | 4 |  |
 
 ---
-### 176. 국내주식 실시간호가 (NXT)
+### 177. 국내주식 실시간호가 (NXT)
 
 | Field | Value |
 |---|---|
@@ -11484,7 +11609,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `NMID_CLS_CODE` | NXT 중간가 매수매도 구분 | string | Y | 1 |  |
 
 ---
-### 177. 국내주식 실시간프로그램매매 (NXT)
+### 178. 국내주식 실시간프로그램매매 (NXT)
 
 | Field | Value |
 |---|---|
@@ -11526,7 +11651,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `WHOL_NTBY_QTY` | 전체순매수호가잔량 | string | Y | 8 |  |
 
 ---
-### 178. 국내주식 실시간체결가 (NXT)
+### 179. 국내주식 실시간체결가 (NXT)
 
 | Field | Value |
 |---|---|
@@ -11603,7 +11728,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `VI_STND_PRC` | 정적VI발동기준가 | string | Y | 4 |  |
 
 ---
-### 179. ELW 실시간체결가
+### 180. ELW 실시간체결가
 
 | Field | Value |
 |---|---|
@@ -11707,7 +11832,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 180. ELW 실시간예상체결
+### 181. ELW 실시간예상체결
 
 | Field | Value |
 |---|---|
@@ -11807,7 +11932,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 181. 국내주식 실시간예상체결 (NXT)
+### 182. 국내주식 실시간예상체결 (NXT)
 
 | Field | Value |
 |---|---|
@@ -11884,7 +12009,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `VI_STND_PRC` | VI 상태값 | string | Y | 4 |  |
 
 ---
-### 182. 국내주식 실시간회원사 (KRX)
+### 183. 국내주식 실시간회원사 (KRX)
 
 | Field | Value |
 |---|---|
@@ -12003,7 +12128,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 183. 국내주식 실시간예상체결 (통합)
+### 184. 국내주식 실시간예상체결 (통합)
 
 | Field | Value |
 |---|---|
@@ -12080,7 +12205,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `VI_STND_PRC` | VI 상태값 | string | Y | 4 |  |
 
 ---
-### 184. 국내주식 장운영정보 (NXT)
+### 185. 국내주식 장운영정보 (NXT)
 
 | Field | Value |
 |---|---|
@@ -12122,7 +12247,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 | `EXCH_CLS_CODE` | 거래소 구분코드 | string | Y | 1 |  |
 
 ---
-### 185. 국내ETF NAV추이
+### 186. 국내ETF NAV추이
 
 | Field | Value |
 |---|---|
@@ -12171,7 +12296,7 @@ fid_cond_mrkt_div_code:J  fid_mrkt_cls_code:  fid_cond_scr_div_code:20234  fid_i
 ```
 
 ---
-### 186. 국내주식 시간외 실시간체결가 (KRX)
+### 187. 국내주식 시간외 실시간체결가 (KRX)
 
 | Field | Value |
 |---|---|

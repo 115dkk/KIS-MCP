@@ -1435,7 +1435,7 @@ FID_COND_MRKT_DIV_CODE:F  FID_COND_SCR_DIV_CODE:20503  FID_COND_MRKT_CLS_CODE:MK
 | `msg1` | 응답메세지 | string | Y | 80 |  |
 | `Output1` | 응답상세 | object array | Y |  |  |
 | `futs_prdy_vrss` | 선물 전일 대비 | string | Y | 11 |  |
-| `prdy_vrss_sign` | 전일 대비 부호 | string | Y | 1 |  |
+| `prdy_vrss_sign` | 전일 대비 부호 | string | Y | 1 | 1: 상한  2: 상승  3: 보합  4: 하한  5: 하락 |
 | `futs_prdy_ctrt` | 선물 전일 대비율 | string | Y | 8 |  |
 | `futs_prdy_clpr` | 선물 전일 종가 | string | Y | 11 |  |
 | `prdy_nmix` | 전일 지수 | string | Y | 11 |  |
@@ -1937,7 +1937,7 @@ fid_cond_mrkt_div_code:O  fid_cond_scr_div_code:20503  fid_mrkt_cls_code:CO  fid
 | `FUTS_SHRN_ISCD` | 선물 단축 종목코드 | string | Y | 9 |  |
 | `BSOP_HOUR` | 영업 시간 | string | Y | 6 |  |
 | `FUTS_PRDY_VRSS` | 선물 전일 대비 | string | Y | 1 |  |
-| `PRDY_VRSS_SIGN` | 전일 대비 부호 | string | Y | 1 |  |
+| `PRDY_VRSS_SIGN` | 전일 대비 부호 | string | Y | 1 | 1: 상한  2: 상승  3: 보합  4: 하한  5: 하락 |
 | `FUTS_PRDY_CTRT` | 선물 전일 대비율 | string | Y | 1 |  |
 | `FUTS_PRPR` | 선물 현재가 | string | Y | 1 |  |
 | `FUTS_OPRC` | 선물 시가2 | string | Y | 1 |  |

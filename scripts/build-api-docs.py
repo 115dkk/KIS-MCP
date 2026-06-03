@@ -21,8 +21,14 @@ from pathlib import Path
 import openpyxl
 
 ROOT = Path(__file__).parent.parent
-XLSX = ROOT / "한국투자증권_오픈API_전체문서_20260418_030007.xlsx"
+SOURCE_GLOB = "한국투자증권_오픈API_전체문서_*.xlsx"
 OUT = ROOT / "docs" / "kis-api"
+
+
+def resolve_source_xlsx() -> Path | None:
+    """Return the latest KIS OpenAPI workbook by filename timestamp."""
+    candidates = sorted(ROOT.glob(SOURCE_GLOB), key=lambda p: p.name)
+    return candidates[-1] if candidates else None
 
 # 메뉴 위치 prefix → 파일명
 CATEGORY_FILE = {
@@ -299,33 +305,51 @@ def render_index(by_file: dict[str, list[dict]]) -> str:
     lines.append("")
     lines.append("| 도구 | TR_ID | 시트명 |")
     lines.append("|---|---|---|")
-    lines.append("| `get_quote` (주식) | `FHKST01010100` | 주식현재가 시세 |")
-    lines.append("| `get_quote` (ETF/ETN) | `FHPST02400000` | ETF/ETN 현재가 |")
-    lines.append("| `get_chart` | `FHKST03010100` | 국내주식기간별시세(일/주/월/년) |")
-    lines.append("| `get_etf_components` | `FHKST121600C0` | ETF 구성종목시세 |")
-    lines.append("| `get_dividend` | `HHKDB669102C0` | 예탁원정보(배당일정) |")
-    lines.append("| `get_credit_ratio` | `FHPST04760000` | 종목별 일별 신용잔고 |")
-    lines.append("| `get_credit_ratio` (공매도) | `FHPST04830000` | 종목별 일별 공매도 |")
-    lines.append("| `get_credit_ratio` (대차) | `HHPST074500C0` | 종목별 일별 대차거래추이 |")
-    lines.append("| `advanced_search` (등락률) | `FHPST01700000` | 국내주식 등락률 순위 |")
-    lines.append("| `advanced_search` (시총) | `FHPST01740000` | 국내주식 시가총액 순위 |")
-    lines.append("| `advanced_search` (거래량) | `FHPST01710000` | 거래량 순위 |")
-    lines.append("| `get_index` (국내) | `FHPUP02100000` | 국내업종 현재지수 |")
-    lines.append("| `get_index_chart` (국내) | `FHPUP02120000` | 국내업종 일자별지수 |")
-    lines.append("| `get_index`/`get_fx` (해외) | `FHKST03030100` | 해외주식 종목/지수/환율 기간별시세 |")
-    lines.append("| `get_commodity` | `HHDFC55010000` | 해외선물종목현재가 |")
-    lines.append("| `get_commodity_chart` | `HHDFC55020100` | 해외선물 체결추이(일간) |")
+    mcp_rows = [
+        ("`get_quote` / `get_fundamentals` / `get_trading_status`", "FHKST01010100", "주식현재가 시세"),
+        ("`get_chart` / `get_return`", "FHKST03010100", "국내주식기간별시세(일_주_월_년)"),
+        ("`get_chart` (분봉)", "FHKST03010230", "주식일별분봉조회"),
+        ("`get_quote` (ETF/ETN)", "FHPST02400000", "ETF_ETN 현재가"),
+        ("`get_etf_components`", "FHKST121600C0", "ETF 구성종목시세"),
+        ("`get_etf_nav_trend` (snapshot)", "FHPST02440000", "NAV 비교추이(종목)"),
+        ("`get_etf_nav_trend` (일)", "FHPST02440200", "NAV 비교추이(일)"),
+        ("`get_etf_nav_trend` (분)", "FHPST02440100", "NAV 비교추이(분)"),
+        ("`get_dividend`", "HHKDB669102C0", "예탁원정보(배당일정)"),
+        ("`get_credit_ratio`", "FHPST04760000", "국내주식 신용잔고 일별추이"),
+        ("`get_credit_ratio` (공매도)", "FHPST04830000", "국내주식 공매도 일별추이"),
+        ("`get_credit_ratio` (대차)", "HHPST074500C0", "종목별 일별 대차거래추이"),
+        ("`get_credit_rank` (신용)", "FHKST17010000", "국내주식 신용잔고 상위"),
+        ("`get_credit_rank` (공매도)", "FHPST04820000", "국내주식 공매도 상위종목"),
+        ("`advanced_search` (등락률)", "FHPST01700000", "국내주식 등락률 순위"),
+        ("`advanced_search` (시총)", "FHPST01740000", "국내주식 시가총액 상위"),
+        ("`advanced_search` (거래량)", "FHPST01710000", "거래량순위"),
+        ("`get_index` (국내)", "FHPUP02100000", "국내업종 현재지수"),
+        ("`get_index_chart` (국내 일/주/월)", "FHPUP02120000", "국내업종 일자별지수"),
+        ("`get_index_chart` (국내 분봉)", "FHPUP02110200", "국내업종 시간별지수(분)"),
+        ("`get_index`/`get_fx`/`get_commodity` (해외 chartprice)", "FHKST03030100", "해외주식 종목_지수_환율기간별시세(일_주_월_년)"),
+        ("`get_index_chart` (해외 분봉)", "FHKST03030200", "해외지수분봉조회"),
+        ("`get_overseas_stock_quote`", "HHDFS76220000", "해외주식 복수종목 시세조회"),
+        ("`get_overseas_stock_info`", "CTPF1702R", "해외주식 상품기본정보"),
+        ("`get_overseas_stock_chart` / `get_return` (해외)", "HHDFS76240000", "해외주식 기간별시세"),
+        ("`get_overseas_stock_chart` (분봉)", "HHDFS76950200", "해외주식분봉조회"),
+        ("`get_commodity` (해외선물)", "HHDFC55010000", "해외선물종목현재가"),
+        ("`get_commodity_chart` (해외선물 일봉)", "HHDFC55020100", "해외선물 체결추이(일간)"),
+        ("`get_commodity_chart` (해외선물 분봉)", "HHDFC55020400", "해외선물 분봉조회"),
+    ]
+    for tool, tr_id, sheet_name in mcp_rows:
+        lines.append(f"| {tool} | `{tr_id}` | {sheet_name} |")
     lines.append("")
     return "\n".join(lines)
 
 
 def main() -> int:
-    if not XLSX.exists():
-        print(f"ERROR: source xlsx not found: {XLSX}", file=sys.stderr)
+    xlsx = resolve_source_xlsx()
+    if not xlsx:
+        print(f"ERROR: source xlsx not found: {SOURCE_GLOB}", file=sys.stderr)
         return 1
 
-    print(f"Loading {XLSX.name} …")
-    wb = openpyxl.load_workbook(XLSX, read_only=True, data_only=True)
+    print(f"Loading {xlsx.name} …")
+    wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
     print(f"  {len(wb.sheetnames)} sheets")
 
     by_file: dict[str, list[dict]] = {}

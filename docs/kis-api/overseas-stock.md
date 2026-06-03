@@ -1592,6 +1592,7 @@ AUTH:  EXCD:NAS  SYMB:AAPL  TDAY:0  KEYB:
 | `sdrf_stop_ecls_erlm_dt` | 급등락정지제외등록일자 | string | Y | 8 |  |
 | `memo_text1` | 메모내용1 | string | Y | 500 |  |
 | `ovrs_now_pric1` | 해외현재가격1 | string | Y | 23 | 23.5 |
+| `sgle_item_lvrg_etp_yn` | 단일종목레버리지ETP여부 | string | Y | 1 |  |
 | `last_rcvg_dtime` | 최종수신일시 | string | Y | 14 |  |
 
 **Request Example:**

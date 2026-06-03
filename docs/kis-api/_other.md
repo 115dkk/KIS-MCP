@@ -1,6 +1,6 @@
 # (기타) API
 
-한국투자증권 OpenAPI — `(기타)` 카테고리 (5개).
+한국투자증권 OpenAPI — `(기타)` 카테고리 (4개).
 원본 시트는 cp949 엑셀이며 본 파일은 LLM 친화 변환본. 검색은 `INDEX.md` 권장.
 
 공통 OAuth 헤더(`authorization`, `appkey`, `appsecret`, `tr_id`, `custtype` 등)는 모든 API 동일하므로 본 문서에서 생략. `INDEX.md` 상단 참고.
@@ -17,41 +17,7 @@
 | TR_ID (실전) | — |
 
 ---
-### 2. Hashkey
-
-| Field | Value |
-|---|---|
-| Sheet | `Hashkey` |
-| Menu | OAuth인증 |
-| Method | `POST` |
-| URL | `/uapi/hashkey` |
-| TR_ID (실전) | — |
-
-#### Request Body
-
-| Element | 한글명 | Type | Req | Len | Description |
-|---|---|---|---|---|---|
-| `JsonBody` | 요청값 | object | Y |  | POST로 보낼 body값    ex)  datas = {      "CANO": '00000000',      "ACNT_PRDT_CD": "01",      "OVRS_EXCG_CD": "SHAA"   } |
-
-#### Response Body
-
-| Element | 한글명 | Type | Req | Len | Description |
-|---|---|---|---|---|---|
-| `JsonBody` | 요청값 | object | Y |  | 요청한 JsonBody |
-| `HASH` | 해쉬키 | string | Y | 256 | [POST API 대상] Client가 요청하는 Request Body를 hashkey api로 생성한 Hash값  * API문서 > hashkey 참조 |
-
-**Request Example:**
-```
-{  	"ORD_PRCS_DVSN_CD": "02",  	"CANO": "계좌번호",  	"ACNT_PRDT_CD": "03",  	"SLL_BUY_DVSN_CD": "02",  	"SHTN_PDNO": "101S06",  	"ORD_QTY": "1",  	"UNIT_PRICE": "370",  	"NMPR_TYPE_CD": "",  	"KRX_NMPR_CNDT_CD": "",  	"CTAC_TLNO": "",  	"FUOP_ITEM_DVSN_CD": "",  	"ORD_DVSN_CD": "02"  }
-```
-
-**Response Example:**
-```
-{    "BODY": {      "ORD_PRCS_DVSN_CD": "02",      "CANO": "계좌번호",      "ACNT_PRDT_CD": "03",      "SLL_BUY_DVSN_CD": "02",      "SHTN_PDNO": "101S06",      "ORD_QTY": "1",      "UNIT_PRICE": "370",      "NMPR_TYPE_CD": "",      "KRX_NMPR_CNDT_CD": "",      "CTAC_TLNO": "",      "FUOP_ITEM_DVSN_CD": "",      "ORD_DVSN_CD": "02"    },    "HASH": "8b84068222a49302f7ef58226d90403f62e216828f8103465f900de0e7be2f0f"  }
-```
-
----
-### 3. 실시간 (웹소켓) 접속키 발급
+### 2. 실시간 (웹소켓) 접속키 발급
 
 | Field | Value |
 |---|---|
@@ -86,7 +52,7 @@
 ```
 
 ---
-### 4. 접근토큰폐기(P)
+### 3. 접근토큰폐기(P)
 
 | Field | Value |
 |---|---|
@@ -122,7 +88,7 @@
 ```
 
 ---
-### 5. 접근토큰발급(P)
+### 4. 접근토큰발급(P)
 
 | Field | Value |
 |---|---|
