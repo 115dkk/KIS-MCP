@@ -159,13 +159,19 @@
 **When to use:** 단일 기간 수익률(%) 한 줄. 시계열 자체가 필요하면 `get_chart`.
 
 **Input:**
-- `symbol`: 6자리 종목코드
+- `symbol`: 국내 종목코드 또는 해외 티커
 - `period`: `1D` | `1W` | `1M` | `3M` | `6M` | `1Y` | `3Y` | `5Y` | `YTD`
+- `market`: 옵션. 국내는 생략 또는 `KRX`, 해외 주식/ETF는 거래소 코드 필수 (`NAS` | `NYS` | `AMS` | `TSE` | `HKS` | `SHS` | `SZS` | `HSX` | `HNX`)
+
+해외 예시:
+```json
+{ "symbol": "RSP", "market": "AMS", "period": "1Y" }
+```
 
 **Output:**
 ```json
 {
-  "symbol": "005930", "period": "1Y",
+  "symbol": "005930", "market": "KRX", "instrumentType": "domestic", "period": "1Y",
   "startDate": "2025-04-18", "endDate": "2026-04-17",
   "startPrice": 65500, "endPrice": 78500,
   "absoluteReturnPct": 19.85,

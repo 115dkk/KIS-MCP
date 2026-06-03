@@ -14,6 +14,23 @@ const chartItem = (date: string, close: number) => ({
   acml_vol: "1000",
 });
 
+const overseasEnv = (output2: unknown) => ({
+  rt_cd: "0",
+  msg_cd: "00000",
+  msg1: "OK",
+  output1: {},
+  output2,
+});
+
+const overseasChartItem = (date: string, close: number) => ({
+  xymd: date,
+  open: String(close),
+  high: String(close),
+  low: String(close),
+  clos: String(close),
+  tvol: "1000",
+});
+
 describe("getReturn business-day windows", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -73,5 +90,49 @@ describe("getReturn business-day windows", () => {
     expect(result.targetStartDate).toBe("2026-05-11");
     expect(result.startDate).toBe("2026-05-11");
     expect(result.absoluteReturnPct).toBe(20);
+  });
+
+  it("supports overseas ETFs when market is provided", async () => {
+    const get = vi.fn(async () =>
+      overseasEnv([
+        overseasChartItem("20260518", 121),
+        overseasChartItem("20260515", 110),
+        overseasChartItem("20260514", 108),
+        overseasChartItem("20260513", 106),
+        overseasChartItem("20260512", 104),
+        overseasChartItem("20260511", 100),
+      ]),
+    );
+    const client = { get } as unknown as KisClient;
+
+    const result = await getReturn(client, { symbol: "RSP", market: "AMS", period: "1D" });
+
+    expect(result.market).toBe("AMS");
+    expect(result.instrumentType).toBe("overseas");
+    expect(result.targetStartDate).toBe("2026-05-15");
+    expect(result.startDate).toBe("2026-05-15");
+    expect(result.endDate).toBe("2026-05-18");
+    expect(result.absoluteReturnPct).toBe(10);
+    expect(get).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: KIS.overseasStockDailyChart.path,
+        query: expect.objectContaining({
+          EXCD: "AMS",
+          SYMB: "RSP",
+          GUBN: "0",
+          BYMD: "20260518",
+        }),
+      }),
+    );
+  });
+
+  it("does not route overseas-looking tickers to the domestic chart without market", async () => {
+    const get = vi.fn();
+    const client = { get } as unknown as KisClient;
+
+    await expect(getReturn(client, { symbol: "RSP", period: "1Y" })).rejects.toThrow(
+      /market for overseas/,
+    );
+    expect(get).not.toHaveBeenCalled();
   });
 });

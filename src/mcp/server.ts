@@ -184,13 +184,18 @@ function registerTools(server: McpServer, client: KisClient, kv: KVNamespace): v
     [
       "지정 기간(1D/1W/1M/3M/6M/1Y/3Y/5Y/YTD)의 절대 수익률(%) 단일 수치.",
       "기간이 1년 초과면 연환산 수익률도 함께 반환.",
-      "내부적으로 get_chart 첫/마지막 종가를 사용. 시계열 자체가 필요하면 get_chart를 직접 호출.",
+      "국내 종목은 market 생략 또는 KRX. 해외 주식/ETF는 market=NAS/NYS/AMS/...를 지정 (예: RSP는 AMS).",
+      "내부적으로 국내는 get_chart, 해외는 get_overseas_stock_chart 첫/마지막 종가를 사용. 시계열 자체가 필요하면 차트 도구를 직접 호출.",
     ].join(" "),
     {
-      symbol: SYMBOL_SCHEMA.describe("종목코드 (예: 005930, Q500001)"),
+      symbol: SYMBOL_SCHEMA.describe("종목코드/티커 (예: 005930, Q500001, RSP, AAPL)"),
       period: z
         .enum(["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "YTD"])
         .describe("수익률 산정 기간"),
+      market: z
+        .enum(["KRX", "NAS", "NYS", "AMS", "TSE", "HKS", "SHS", "SZS", "HSX", "HNX"])
+        .optional()
+        .describe("거래소 코드. 국내는 생략/KRX, 해외는 NAS/NYS/AMS 등 필수"),
     },
     async (args) => {
       try {
