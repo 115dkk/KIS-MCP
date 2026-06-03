@@ -178,6 +178,18 @@ npm run build:index   # 인덱스 갱신
 npx wrangler deploy   # 워커 재배포 (인덱스 변경분 반영)
 ```
 
+### 8. API 레퍼런스 자동 갱신
+
+`.github/workflows/refresh-kis-api-docs.yml`가 매주 월요일 03:00 KST에 한투 API 포털의 `API_COLLECTION` 파일을 다운로드하고, `docs/kis-api/`를 재생성합니다. 변경이 있을 때만 새 xlsx 원본과 markdown 레퍼런스를 main에 커밋합니다.
+
+수동 갱신:
+
+```bash
+python scripts/download-kis-api-workbook.py
+python scripts/build-api-docs.py
+python scripts/verify-api-docs.py
+```
+
 ---
 
 ## 사용 방법
